@@ -1,0 +1,120 @@
+# KeepGreen explore: `npx keepgreen init` writes this file to
+# .github/workflows/keepgreen-explore.yml. Or copy it by hand.
+#
+# It looks at your app, picks important user flows that have no test yet,
+# writes a test for each and opens ONE pull request with the tests that
+# passed every run. It runs on your own GitHub runner with your own AI key.
+# No XSignOn server is involved.
+#
+# Two jobs:
+#   explore  runs the AI-written tests with a READ-ONLY token and uploads
+#            them as a patch.
+#   publish  never runs your project's code: it accepts the patch only if it
+#            just ADDS test files, then opens the PR.
+#
+# Before you start:
+#   1. Set url: (or start-command + start-url) in .keepgreen.yml.
+#   2. Make the explore job match your test job below: Node or Python
+#      version, install steps, browsers, env vars and services, so the app and
+#      the tests run here the same way they do in your CI.
+#   3. Add your AI key as a repository secret named ANTHROPIC_API_KEY
+#      (or OPENAI_API_KEY plus a repository variable AUTOHEAL_MODEL).
+#   4. Settings > Actions > General > Workflow permissions: tick
+#      "Allow GitHub Actions to create and approve pull requests".
+#   5. Run it from Actions > KeepGreen explore > Run workflow, or turn on the
+#      weekly schedule below.
+#
+# Your AI key is in the explore job, where the new tests run. Use a key with
+# a spend limit.
+
+name: KeepGreen explore
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: App URL to explore (blank = url in .keepgreen.yml)
+        required: false
+      max-flows:
+        description: New tests to try (1-10)
+        required: false
+        default: "3"
+  # schedule:
+  #   - cron: "0 6 * * 1" # every Monday 06:00 UTC
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keepgreen-explore
+  cancel-in-progress: false
+
+jobs:
+  explore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    outputs:
+      written: ${{ steps.keepgreen.outputs.written }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      # Your install steps (same as your test workflow):
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - id: keepgreen
+        uses: xsignon-secure/keepgreen@v{{VERSION}}
+        with:
+          url: ${{ inputs.url }}
+          max-flows: ${{ inputs.max-flows }}
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          model: ${{ vars.AUTOHEAL_MODEL }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.keepgreen.outputs.written != '0'
+        with:
+          name: keepgreen-out
+          path: keepgreen-out/
+          retention-days: 7
+          if-no-files-found: error
+
+  publish:
+    needs: explore
+    if: needs.explore.outputs.written != '0' && needs.explore.outputs.written != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: keepgreen-out
+          path: ${{ runner.temp }}/keepgreen-out
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Check the patch only adds test files
+        env:
+          npm_config_ignore_scripts: "true"
+          OUT: ${{ runner.temp }}/keepgreen-out
+        run: npx -y keepgreen@{{VERSION}} check-patch "$OUT/new-tests.patch"
+      - name: Open the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OUT: ${{ runner.temp }}/keepgreen-out
+          BRANCH: keepgreen/explore-${{ github.run_id }}
+        run: |
+          git -c core.hooksPath=/dev/null apply --check "$OUT/new-tests.patch"
+          git -c core.hooksPath=/dev/null apply "$OUT/new-tests.patch"
+          git switch -c "$BRANCH"
+          git add -A
+          git -c user.name="keepgreen[bot]" -c user.email="keepgreen@users.noreply.github.com" -c core.hooksPath=/dev/null commit -m "test: new end-to-end tests from KeepGreen explore"
+          git push origin "$BRANCH"
+          gh pr create --head "$BRANCH" --title "KeepGreen: new end-to-end tests" --body-file "$OUT/report.md"

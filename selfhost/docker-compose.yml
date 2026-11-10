@@ -1,0 +1,49 @@
+# KeepGreen self-host bundle: the two optional servers, on your own machine
+# or VM, in one command. Nothing here talks to an XSignOn server.
+#
+#   history    playwright-e2e-mcp history server (test runs from every CI job,
+#              flaky ranking, the commit where a test went bad)   port 8787
+#   dashboard  AutoHeal dashboard (fixes, quarantines, blocked cheats, app
+#              bugs, AI spend across your repos)                  port 8080
+#
+# Start:
+#   sh make-env.sh your-org/your-repo   # writes .env with random secrets
+#   docker compose up -d --build
+#
+# Both ports listen on 127.0.0.1 only. Put an HTTPS reverse proxy in front
+# (Caddy, nginx, Cloudflare Tunnel) before you point CI at them; see README.md.
+# The images build from the tagged source on GitHub, so you run exactly the
+# released code.
+
+name: keepgreen
+
+services:
+  history:
+    build:
+      context: https://github.com/xsignon-secure/E2E.git#v0.16.1:history-server
+    restart: unless-stopped
+    environment:
+      HISTORY_TOKENS: ${HISTORY_TOKENS:?set HISTORY_TOKENS in .env}
+      HISTORY_RETENTION_DAYS: ${HISTORY_RETENTION_DAYS:-90}
+    volumes:
+      - history-data:/data
+    ports:
+      - "127.0.0.1:8787:8787"
+
+  dashboard:
+    build:
+      context: https://github.com/xsignon-secure/AutoHeal-AI.git#v0.12.1
+    restart: unless-stopped
+    environment:
+      AUTOHEAL_DASHBOARD_SECRET: ${AUTOHEAL_DASHBOARD_SECRET:?set AUTOHEAL_DASHBOARD_SECRET in .env}
+      AUTOHEAL_DASHBOARD_VIEW_TOKEN: ${AUTOHEAL_DASHBOARD_VIEW_TOKEN:?set AUTOHEAL_DASHBOARD_VIEW_TOKEN in .env}
+      AUTOHEAL_DASHBOARD_REPOS: ${AUTOHEAL_DASHBOARD_REPOS:?set AUTOHEAL_DASHBOARD_REPOS in .env}
+      AUTOHEAL_TRUST_PROXY: ${AUTOHEAL_TRUST_PROXY:-0}
+    volumes:
+      - dashboard-data:/data
+    ports:
+      - "127.0.0.1:8080:8080"
+
+volumes:
+  history-data:
+  dashboard-data:

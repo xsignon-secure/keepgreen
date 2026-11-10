@@ -1,0 +1,22 @@
+# KeepGreen settings. Flags on the command line win over this file.
+# Docs: https://github.com/xsignon-secure/keepgreen#settings
+
+# Where your app runs. Either a URL that is already up...
+url: http://localhost:3000
+# ...or a command that starts it, plus the address to wait for:
+# start-command: npm run dev
+# start-url: http://localhost:3000
+
+# Extra pages to look at when choosing what to test (paths of your app).
+pages:
+#  - /login
+#  - /pricing
+
+# New tests per explore run (1-10).
+max-flows: 3
+# AI spend cap for one explore run, in US dollars, billed by your own provider.
+max-usd: 3
+# Passing runs in a row a new test needs before it is kept (2-20).
+runs: 5
+# auto | playwright | pytest | cypress | webdriverio
+framework: auto

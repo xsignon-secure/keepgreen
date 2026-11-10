@@ -1,0 +1,67 @@
+{
+  "name": "keepgreen",
+  "version": "0.1.0",
+  "description": "Free, self-hosted AI test agent: explores your app and writes new Playwright tests, and fixes the ones that break, with your own AI key. Built on playwright-e2e-mcp and AutoHeal.",
+  "author": "xsignon-secure (https://github.com/xsignon-secure)",
+  "license": "MIT",
+  "type": "module",
+  "homepage": "https://github.com/xsignon-secure/keepgreen",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xsignon-secure/keepgreen.git"
+  },
+  "bugs": {
+    "url": "https://github.com/xsignon-secure/keepgreen/issues"
+  },
+  "keywords": [
+    "playwright",
+    "e2e",
+    "ai-agent",
+    "test-generation",
+    "self-healing",
+    "github-action",
+    "mcp",
+    "test-automation",
+    "free",
+    "open-source"
+  ],
+  "bin": {
+    "keepgreen": "dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "templates",
+    "selfhost",
+    "action.yml",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test --test-reporter=spec test/*.test.mjs",
+    "prepublishOnly": "npm test"
+  },
+  "dependencies": {
+    "xsignon-autoheal": "0.12.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}
