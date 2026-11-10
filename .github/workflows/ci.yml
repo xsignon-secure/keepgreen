@@ -61,7 +61,7 @@ jobs:
       - name: Build and start
         working-directory: selfhost
         run: |
-          cp .env.example .env
+          sh make-env.sh xsignon-secure/keepgreen
           docker compose up -d --build
       - name: Both servers answer
         run: |

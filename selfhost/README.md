@@ -10,8 +10,11 @@ optional extras you host yourself, started together with Docker Compose:
 
 ## Start
 
+The servers refuse to start with short or placeholder secrets, so let `make-env.sh` create them
+(or copy `.env.example` to `.env` and fill it in by hand).
+
 ```bash
-cp .env.example .env      # fill in the secrets; make each with: openssl rand -hex 24
+sh make-env.sh your-org/your-repo   # writes .env with fresh random secrets
 docker compose up -d --build
 ```
 

@@ -143,7 +143,7 @@ commit where a test went bad) and **AutoHeal's dashboard** (fixes, blocked cheat
 [`selfhost/`](selfhost/) starts both servers with one command:
 
 ```bash
-cd selfhost && cp .env.example .env && docker compose up -d --build
+cd selfhost && sh make-env.sh your-org/your-repo && docker compose up -d --build
 ```
 
 ## Security

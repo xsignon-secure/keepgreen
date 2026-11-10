@@ -7,7 +7,7 @@
 #              bugs, AI spend across your repos)                  port 8080
 #
 # Start:
-#   cp .env.example .env    # then fill in the secrets (see the file)
+#   sh make-env.sh your-org/your-repo   # writes .env with random secrets
 #   docker compose up -d --build
 #
 # Both ports listen on 127.0.0.1 only. Put an HTTPS reverse proxy in front
