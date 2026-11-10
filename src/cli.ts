@@ -111,6 +111,9 @@ async function cmdExplore(argv: string[]): Promise<number> {
   const { project: _p, out: _o, 'dry-run': _d, ...flags } = values;
   const config = resolveConfig(await loadConfigFile(projectRoot), flags as Record<string, string | undefined>);
   const env = process.env;
+  // Lets playwright.config tell a KeepGreen run apart, e.g.
+  // reuseExistingServer: !process.env.CI || !!process.env.KEEPGREEN
+  env.KEEPGREEN = '1';
   const provider = providerFromEnv(env);
   if (!provider) throw new ConfigError('keepgreen explore needs an AI key: set ANTHROPIC_API_KEY, OPENAI_API_KEY (and AUTOHEAL_MODEL) or AUTOHEAL_BASE_URL.');
   const framework = await detectFramework(projectRoot, config.framework);

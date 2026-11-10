@@ -74,7 +74,7 @@ Then:
 You can also use the action directly:
 
 ```yaml
-- uses: xsignon-secure/keepgreen@v0.1.0
+- uses: xsignon-secure/keepgreen@v0.1.1
   with:
     url: http://localhost:3000
     anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -104,9 +104,31 @@ AI settings use AutoHeal's variables:
 | --- | --- |
 | `ANTHROPIC_API_KEY` | Use Anthropic (default model `claude-opus-5-5`) |
 | `OPENAI_API_KEY` + `AUTOHEAL_MODEL` | Use OpenAI |
-| `AUTOHEAL_BASE_URL` + `AUTOHEAL_MODEL` | Any OpenAI-compatible endpoint, e.g. Ollama at `http://localhost:11434/v1` |
+| `AUTOHEAL_BASE_URL` + `AUTOHEAL_MODEL` (+ `AUTOHEAL_API_KEY`) | Any OpenAI-compatible endpoint: OpenRouter, or Ollama at `http://localhost:11434/v1` |
 | `AUTOHEAL_EFFORT` | Anthropic effort: `low` … `max` (default `medium`) |
 | `AUTOHEAL_PRICE_IN` / `AUTOHEAL_PRICE_OUT` | USD per 1M tokens, for models without a listed price |
+
+### OpenRouter (or any OpenAI-compatible endpoint)
+
+```bash
+export AUTOHEAL_BASE_URL=https://openrouter.ai/api/v1
+export AUTOHEAL_API_KEY=sk-or-...            # your OpenRouter key; give it a credit limit
+export AUTOHEAL_MODEL=<model id from openrouter.ai/models>
+export AUTOHEAL_PRICE_IN=3 AUTOHEAL_PRICE_OUT=15   # USD per 1M tokens of that model, so max-usd is enforced
+npx keepgreen explore --url http://localhost:3000
+```
+
+In the Action: `base-url: https://openrouter.ai/api/v1`, `api-key: ${{ secrets.OPENROUTER_API_KEY }}`,
+`model: ...`, and `price-in` / `price-out`.
+
+### Playwright `webServer`
+
+If your `playwright.config` starts the app with `webServer`, and KeepGreen starts it too
+(`start-command`), let Playwright reuse it during a KeepGreen run:
+
+```ts
+webServer: { command: 'npm run start', url: 'http://127.0.0.1:3000/', reuseExistingServer: !process.env.CI || !!process.env.KEEPGREEN },
+```
 
 ## How explore works
 
