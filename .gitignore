@@ -3,3 +3,5 @@ dist/
 *.tgz
 keepgreen-out/
 selfhost/.env
+playwright-report/
+test-results/
