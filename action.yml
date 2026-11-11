@@ -44,7 +44,23 @@ inputs:
     required: false
     default: ""
   model:
-    description: Model id (optional for Anthropic)
+    description: Model id (optional for Anthropic; for OpenRouter e.g. the id shown on openrouter.ai/models)
+    required: false
+    default: ""
+  base-url:
+    description: OpenAI-compatible endpoint, e.g. https://openrouter.ai/api/v1 (use with api-key and model)
+    required: false
+    default: ""
+  api-key:
+    description: API key for base-url (e.g. your OpenRouter key)
+    required: false
+    default: ""
+  price-in:
+    description: USD per 1M input tokens, for models KeepGreen has no price for (enforces max-usd)
+    required: false
+    default: ""
+  price-out:
+    description: USD per 1M output tokens
     required: false
     default: ""
   working-directory:
@@ -54,7 +70,7 @@ inputs:
   version:
     description: keepgreen version from npm
     required: false
-    default: "0.1.0"
+    default: "0.1.1"
 
 outputs:
   written:
@@ -71,6 +87,10 @@ runs:
         ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
         OPENAI_API_KEY: ${{ inputs.openai-api-key }}
         AUTOHEAL_MODEL: ${{ inputs.model }}
+        KG_BASE_URL: ${{ inputs.base-url }}
+        KG_API_KEY: ${{ inputs.api-key }}
+        KG_PRICE_IN: ${{ inputs.price-in }}
+        KG_PRICE_OUT: ${{ inputs.price-out }}
         KG_VERSION: ${{ inputs.version }}
         KG_URL: ${{ inputs.url }}
         KG_START_COMMAND: ${{ inputs.start-command }}
@@ -83,6 +103,12 @@ runs:
         [ -n "$ANTHROPIC_API_KEY" ] || unset ANTHROPIC_API_KEY
         [ -n "$OPENAI_API_KEY" ] || unset OPENAI_API_KEY
         [ -n "$AUTOHEAL_MODEL" ] || unset AUTOHEAL_MODEL
+        # Inputs win; otherwise keep any AUTOHEAL_* already set on the job.
+        if [ -n "$KG_BASE_URL" ]; then export AUTOHEAL_PROVIDER=openai-compatible AUTOHEAL_BASE_URL="$KG_BASE_URL"; fi
+        if [ -n "$KG_API_KEY" ]; then export AUTOHEAL_API_KEY="$KG_API_KEY"; fi
+        if [ -n "$KG_PRICE_IN" ]; then export AUTOHEAL_PRICE_IN="$KG_PRICE_IN"; fi
+        if [ -n "$KG_PRICE_OUT" ]; then export AUTOHEAL_PRICE_OUT="$KG_PRICE_OUT"; fi
+        unset KG_API_KEY
         if ! [[ "$KG_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "::error::version must be like 1.2.3"; exit 2; fi
         args=(explore --out "$OUT")
         [ -n "$KG_URL" ] && args+=(--url "$KG_URL")

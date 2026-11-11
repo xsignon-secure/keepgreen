@@ -17,6 +17,7 @@ import {
   ConfigError,
   CypressTools,
   McpTools,
+  ProviderError,
   WdioTools,
   checkAppUrl,
   cover,
@@ -111,6 +112,9 @@ async function cmdExplore(argv: string[]): Promise<number> {
   const { project: _p, out: _o, 'dry-run': _d, ...flags } = values;
   const config = resolveConfig(await loadConfigFile(projectRoot), flags as Record<string, string | undefined>);
   const env = process.env;
+  // Lets playwright.config tell a KeepGreen run apart, e.g.
+  // reuseExistingServer: !process.env.CI || !!process.env.KEEPGREEN
+  env.KEEPGREEN = '1';
   const provider = providerFromEnv(env);
   if (!provider) throw new ConfigError('keepgreen explore needs an AI key: set ANTHROPIC_API_KEY, OPENAI_API_KEY (and AUTOHEAL_MODEL) or AUTOHEAL_BASE_URL.');
   const framework = await detectFramework(projectRoot, config.framework);
@@ -249,6 +253,12 @@ export async function main(argv: string[]): Promise<number> {
     if (error instanceof ConfigError || error instanceof ConfigFileError || (error as { code?: string }).code?.startsWith('ERR_PARSE_ARGS')) {
       log((error as Error).message);
       return 2;
+    }
+    if (error instanceof ProviderError) {
+      log(`The AI provider refused the request: ${error.message.slice(0, 600)}`);
+      if (/HTTP 402|credits|quota|insufficient/i.test(error.message)) log('Your AI account or key is out of credit (or its spend limit is too low). Add credit or raise the key\'s limit, then run again.');
+      else if (/HTTP 401|HTTP 403|api key|unauthori/i.test(error.message)) log('Check the API key (and AUTOHEAL_BASE_URL / AUTOHEAL_MODEL for OpenAI-compatible endpoints).');
+      return 1;
     }
     log(error instanceof Error ? (error.stack ?? error.message) : String(error));
     return 1;

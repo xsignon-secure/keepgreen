@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1
+
+- OpenRouter and other OpenAI-compatible endpoints in the GitHub Action: new `base-url`, `api-key`, `price-in` and `price-out` inputs (the template shows them commented out). The README has an OpenRouter section.
+- `keepgreen explore` sets `KEEPGREEN=1` for the app and the tests, so a Playwright `webServer` can reuse the app KeepGreen started: `reuseExistingServer: !process.env.CI || !!process.env.KEEPGREEN`. Without it, Playwright stops in CI with "port already in use".
+- Explore workflow template: a blank `max-flows` input now keeps the value from `.keepgreen.yml` (it used to force 3).
+- A refused AI request (no credit, bad key) now prints a short reason and what to do, instead of a stack trace.
+- First release published from CI with npm provenance (0.1.0 was published by hand).
+
 ## 0.1.0
 
 First release.

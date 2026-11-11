@@ -18,7 +18,10 @@
 #      version, install steps, browsers, env vars and services, so the app and
 #      the tests run here the same way they do in your CI.
 #   3. Add your AI key as a repository secret named ANTHROPIC_API_KEY
-#      (or OPENAI_API_KEY plus a repository variable AUTOHEAL_MODEL).
+#      (or OPENAI_API_KEY plus a repository variable AUTOHEAL_MODEL; or
+#      OpenRouter: see base-url / api-key below).
+#   If playwright.config has a webServer, let Playwright reuse the app
+#   KeepGreen started: reuseExistingServer: !process.env.CI || !!process.env.KEEPGREEN
 #   4. Settings > Actions > General > Workflow permissions: tick
 #      "Allow GitHub Actions to create and approve pull requests".
 #   5. Run it from Actions > KeepGreen explore > Run workflow, or turn on the
@@ -36,9 +39,8 @@ on:
         description: App URL to explore (blank = url in .keepgreen.yml)
         required: false
       max-flows:
-        description: New tests to try (1-10)
+        description: New tests to try (1-10; blank = .keepgreen.yml)
         required: false
-        default: "3"
   # schedule:
   #   - cron: "0 6 * * 1" # every Monday 06:00 UTC
 
@@ -75,6 +77,11 @@ jobs:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           model: ${{ vars.AUTOHEAL_MODEL }}
+          # OpenRouter or another OpenAI-compatible endpoint instead:
+          # base-url: https://openrouter.ai/api/v1
+          # api-key: ${{ secrets.OPENROUTER_API_KEY }}
+          # price-in: "3"    # USD per 1M tokens of your model, so max-usd is enforced
+          # price-out: "15"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: steps.keepgreen.outputs.written != '0'
         with:
