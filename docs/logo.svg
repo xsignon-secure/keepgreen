@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="KeepGreen logo: a check mark inside a looping arrow, with an AI spark">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#064e3b"/>
+      <stop offset="0.55" stop-color="#047857"/>
+      <stop offset="1" stop-color="#0e7490"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.45" r="0.5">
+      <stop offset="0" stop-color="#6ee7b7" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#6ee7b7" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="116" fill="url(#glow)"/>
+  <rect x="10" y="10" width="492" height="492" rx="106" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="4"/>
+  <!-- the loop: an almost closed ring with an arrowhead, "keeps going" -->
+  <path d="M 384 196 A 140 140 0 1 0 396 300" fill="none" stroke="#ecfdf5" stroke-width="30" stroke-linecap="round"/>
+  <path d="M 344 186 L 392 192 L 398 142" fill="none" stroke="#ecfdf5" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- the check -->
+  <path d="M 188 266 L 234 312 L 312 222" fill="none" stroke="#4ade80" stroke-width="38" stroke-linecap="round" stroke-linejoin="round" filter="url(#soft)"/>
+  <!-- AI spark -->
+  <path d="M 414 330 L 424 358 L 452 368 L 424 378 L 414 406 L 404 378 L 376 368 L 404 358 Z" fill="#fde68a"/>
+</svg>

@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { ScriptedProvider, Budget } from 'xsignon-autoheal';
-import { testFileFor, explore, planFlows, cleanFlows, existingTitles, exploreReport } from '../dist/index.js';
+import { testFileFor, uniqueTestFile, lookupPrice, explore, planFlows, cleanFlows, existingTitles, exploreReport } from '../dist/index.js';
 
 function fakeEngine(pages = {}) {
   const calls = [];
@@ -87,7 +87,7 @@ test('explore writes one test per flow, shares the budget and reports', async ()
     cover,
   });
   assert.equal(seen.length, 3);
-  assert.equal(seen[0].file, 'tests/keepgreen-a-visitor-searches-for-shoes-and.spec.ts');
+  assert.equal(seen[0].file, 'tests/keepgreen-searches-shoes-one-result.spec.ts');
   assert.ok(seen[0].maxUsd > 0.9 && seen[0].maxUsd < 1, `first share ${seen[0].maxUsd}`);
   assert.ok(seen[1].maxUsd > seen[0].maxUsd, 'unspent money rolls over to later flows');
   assert.deepEqual(result.results.map((r) => r.result.status), ['written', 'rejected', 'error']);
@@ -128,4 +128,60 @@ test('new test files are named after KeepGreen', () => {
   assert.equal(testFileFor('A user logs in', 'playwright'), 'tests/keepgreen-a-user-logs-in.spec.ts');
   assert.equal(testFileFor('A user logs in', 'pytest'), 'tests/test_keepgreen_a_user_logs_in.py');
   assert.equal(testFileFor('A user logs in', 'cypress'), 'cypress/e2e/keepgreen-a-user-logs-in.cy.ts');
+});
+
+test('file names skip filler words and never collide with each other or with files on disk', async () => {
+  assert.equal(testFileFor('A visitor opens the home page, clicks the Account link and lands on /login', 'playwright'), 'tests/keepgreen-opens-home-clicks-account-link-lands.spec.ts');
+  const root = mkdtempSync(path.join(os.tmpdir(), 'kg-names-'));
+  mkdirSync(path.join(root, 'tests'));
+  writeFileSync(path.join(root, 'tests/keepgreen-a-user-logs-in.spec.ts'), '');
+  const taken = new Set();
+  assert.equal(await uniqueTestFile('A user logs in', 'playwright', root, taken), 'tests/keepgreen-a-user-logs-in-2.spec.ts');
+  assert.equal(await uniqueTestFile('A user logs in', 'playwright', root, taken), 'tests/keepgreen-a-user-logs-in-3.spec.ts');
+  assert.equal(await uniqueTestFile('A user logs in', 'pytest', root, taken), 'tests/test_keepgreen_a_user_logs_in.py');
+  assert.equal(await uniqueTestFile('A user logs in', 'pytest', root, taken), 'tests/test_keepgreen_a_user_logs_in_2.py');
+  assert.equal(await uniqueTestFile('A user logs in', 'cypress', root, taken), 'cypress/e2e/keepgreen-a-user-logs-in.cy.ts');
+  assert.equal(await uniqueTestFile('A user logs in', 'cypress', root, taken), 'cypress/e2e/keepgreen-a-user-logs-in-2.cy.ts');
+});
+
+test('flows you name skip planning; AI text in the report cannot ping anyone', async () => {
+  const files = [];
+  const result = await explore({
+    projectRoot: mkdtempSync(path.join(os.tmpdir(), 'kg-given-')),
+    provider: new ScriptedProvider([]), // planning would throw: no scripted answer
+    engine: fakeEngine({}),
+    runner: fakeEngine({}),
+    appUrl: 'https://staging.example.com',
+    pages: [],
+    existing: [],
+    maxFlows: 3,
+    maxUsd: 3,
+    runs: 5,
+    price: [4, 20],
+    framework: 'playwright',
+    flows: ['A shopper adds the mug to the cart, ask @octocat', 'A shopper adds the mug to the cart, ask @octocat', 'tiny'],
+    cover: async (o) => {
+      files.push(o.file);
+      return { status: 'written', file: o.file, explanation: 'ok', runs: 5, attempts: 1 };
+    },
+  });
+  assert.equal(result.flows.length, 1, 'duplicates and junk are dropped');
+  assert.equal(result.flows[0].why, 'named by you');
+  assert.equal(files.length, 1);
+  const report = exploreReport(result, 5);
+  assert.doesNotMatch(report, /@octocat/);
+  assert.match(report, /@​octocat/);
+  await assert.rejects(explore({ projectRoot: '/tmp/x', provider: new ScriptedProvider([]), engine: fakeEngine({}), runner: fakeEngine({}), appUrl: 'http://localhost:3000', pages: [], existing: [], maxFlows: 3, maxUsd: 3, runs: 5, price: null, framework: 'playwright', flows: ['tiny'], cover: async () => ({}) }), /--flow/);
+});
+
+test('OpenRouter prices are looked up for models AutoHeal has no price for', async () => {
+  const models = { data: [{ id: 'anthropic/claude-sonnet-5.5', pricing: { prompt: '0.000002', completion: '0.00001' } }] };
+  const fetchFn = async (url) => {
+    assert.equal(String(url), 'https://openrouter.ai/api/v1/models');
+    return { ok: true, json: async () => models };
+  };
+  assert.deepEqual(await lookupPrice('anthropic/claude-sonnet-5.5', 'https://openrouter.ai/api/v1', { fetchFn }), [2, 10]);
+  assert.equal(await lookupPrice('nope/model', 'https://openrouter.ai/api/v1', { fetchFn }), null);
+  assert.equal(await lookupPrice('anthropic/claude-sonnet-5.5', 'http://localhost:11434/v1', { fetchFn: async () => { throw new Error('must not fetch'); } }), null);
+  assert.equal(await lookupPrice('x', 'https://openrouter.ai/api/v1', { fetchFn: async () => { throw new Error('offline'); } }), null);
 });

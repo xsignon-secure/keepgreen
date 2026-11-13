@@ -11,7 +11,7 @@
  * The AI key is the user's own. Nothing here talks to an XSignOn server.
  */
 
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { access, readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { Budget, ProviderError, coverFile, type CoverOptions, type CoverResult, type Part, type Provider, type ToolCaller, type ToolSpec, type Turn } from 'xsignon-autoheal';
 
@@ -190,15 +190,20 @@ export interface ExploreOptions extends Omit<PlanOptions, 'budget'> {
   cover: (options: CoverOptions) => Promise<CoverResult>;
   /** Plan only, write nothing. */
   dryRun?: boolean;
+  /** Flows named by the user: skip planning and write a test for each. */
+  flows?: string[];
 }
 
 /** Plan, then write one test per flow. The spend cap covers the whole run. */
 export async function explore(options: ExploreOptions): Promise<ExploreResult> {
   const log = options.log ?? (() => undefined);
   const planBudget = new Budget({ maxUsd: Math.min(0.5, options.maxUsd * 0.15), maxTokens: 400_000, maxSteps: 3 }, options.price);
-  const flows = await planFlows({ ...options, budget: planBudget });
+  const given = options.flows?.length ? cleanFlows(options.flows.map((flow) => ({ flow, why: 'named by you' })), options.maxFlows) : null;
+  if (options.flows?.length && !given?.length) throw new Error('Each --flow must be one sentence of 10 to 500 characters.');
+  const flows = given ?? (await planFlows({ ...options, budget: planBudget }));
   let spent = planBudget.snapshot().usd;
-  let priced = planBudget.snapshot().priced;
+  let priced = given ? options.price !== null : planBudget.snapshot().priced;
+  const taken = new Set<string>();
   const results: ExploreResult['results'] = [];
   if (!flows.length) log('The AI found no untested flows to add.');
   else log(`Planned ${flows.length} flow(s):\n${flows.map((f, i) => `  ${i + 1}. ${f.flow} (${f.why})`).join('\n')}`);
@@ -220,7 +225,7 @@ export async function explore(options: ExploreOptions): Promise<ExploreResult> {
       result = await options.cover({
         projectRoot: options.projectRoot,
         flow: flow.flow,
-        file: testFileFor(flow.flow, options.framework),
+        file: await uniqueTestFile(flow.flow, options.framework, options.projectRoot, taken),
         appUrl: options.appUrl,
         provider: options.provider,
         budget,
@@ -241,13 +246,40 @@ export async function explore(options: ExploreOptions): Promise<ExploreResult> {
   return { flows, results, usd: spent, priced };
 }
 
+// Words that say nothing about the flow. Most flows start "A visitor opens the
+// home page...", so without this every file name would start the same way.
+const FILLER = new Set(['a', 'an', 'the', 'and', 'then', 'or', 'to', 'of', 'on', 'in', 'at', 'from', 'with', 'where', 'that', 'is', 'are', 'it', 'its', 'their', 'his', 'her', 'they', 'user', 'users', 'visitor', 'visitors', 'shopper', 'customer', 'someone', 'person', 'sees', 'see', 'can', 'least', 'for', 'page']);
+
 /** tests/keepgreen-<words>.spec.ts (pytest: tests/test_keepgreen_<words>.py), so KeepGreen's tests are easy to spot. */
 export function testFileFor(flow: string, framework: NonNullable<CoverOptions['framework']>): string {
-  return coverFile(flow, framework).replace(/autoheal-/, 'keepgreen-').replace(/test_autoheal_/, 'test_keepgreen_');
+  const words = flow.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean);
+  const meaningful = [...new Set(words.filter((w) => !FILLER.has(w)))];
+  const named = (meaningful.length >= 2 ? meaningful : words).join(' ');
+  return coverFile(named || flow, framework).replace(/autoheal-/, 'keepgreen-').replace(/test_autoheal_/, 'test_keepgreen_');
 }
 
+/**
+ * testFileFor, plus -2, -3 ... when that name is already used by a file on
+ * disk or by an earlier flow of this run. AutoHeal's cover refuses to write
+ * over an existing file, so two flows with the same name used to lose one.
+ */
+export async function uniqueTestFile(flow: string, framework: NonNullable<CoverOptions['framework']>, root: string, taken: Set<string>): Promise<string> {
+  const base = testFileFor(flow, framework);
+  const dot = base.search(/(?:\.spec|\.cy|\.e2e)?\.[a-z]+$/);
+  for (let n = 1; n < 100; n++) {
+    const file = n === 1 ? base : `${base.slice(0, dot)}${framework === 'pytest' ? '_' : '-'}${n}${base.slice(dot)}`;
+    if (taken.has(file)) continue;
+    const onDisk = await access(path.join(root, file)).then(() => true, () => false);
+    if (onDisk) continue;
+    taken.add(file);
+    return file;
+  }
+  throw new Error(`Too many test files named like ${base}.`);
+}
+
+/** One table cell. AI text goes into a PR body, so @mentions are defused (no one gets pinged). */
 function cell(text: string): string {
-  return text.replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim();
+  return text.replace(/\|/g, '\\|').replace(/\s+/g, ' ').replace(/@(?=[A-Za-z0-9_-])/g, '@\u200b').trim();
 }
 
 /** Markdown summary for the terminal, the job summary and the PR body. */
@@ -268,7 +300,7 @@ export function exploreReport(result: ExploreResult, runs: number): string {
     }
     lines.push('');
   } else if (result.flows.length) {
-    lines.push('Planned flows (dry run, nothing written):', '', ...result.flows.map((f, i) => `${i + 1}. ${f.flow} (${f.why})`), '');
+    lines.push('Planned flows (dry run, nothing written):', '', ...result.flows.map((f, i) => `${i + 1}. ${cell(f.flow)} (${cell(f.why)})`), '');
   }
   lines.push(`AI spend: ${result.priced ? `about $${result.usd.toFixed(2)}` : 'unknown (model price not listed; set AUTOHEAL_PRICE_IN / AUTOHEAL_PRICE_OUT)'}, billed by your own AI provider.`);
   lines.push('', 'Review each test like any other change before you merge it.');

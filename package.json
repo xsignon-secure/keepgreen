@@ -1,6 +1,6 @@
 {
   "name": "keepgreen",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Free, self-hosted AI test agent: explores your app and writes new Playwright tests, and fixes the ones that break, with your own AI key. Built on playwright-e2e-mcp and AutoHeal.",
   "author": "xsignon-secure (https://github.com/xsignon-secure)",
   "license": "MIT",
