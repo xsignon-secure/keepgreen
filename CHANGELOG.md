@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1
+
+- AutoHeal 0.13.0 inside (healing and test writing): OpenRouter works in AutoHeal's heal Action (`api-key` input), OpenRouter prices are looked up for healing too, and the engine is playwright-e2e-mcp 0.16.1 (Playwright 1.65, GitHub tokens kept out of test processes).
+- The self-host bundle builds the AutoHeal dashboard from v0.13.0.
+
 ## 0.2.0
 
 Fixes from a full audit, plus the most-asked-for features.
