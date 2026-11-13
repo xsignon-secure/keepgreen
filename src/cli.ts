@@ -37,6 +37,7 @@ import { existingTitles, explore, exploreReport } from './explore.js';
 import { init } from './init.js';
 import { newFilesPatch } from './newfiles.js';
 import { checkPatch } from './patch.js';
+import { lookupPrice } from './price.js';
 import { VERSION } from './version.js';
 
 export const USAGE = `keepgreen ${VERSION}: free, self-hosted AI test agent. It writes new end-to-end tests
@@ -48,9 +49,11 @@ OpenAI-compatible endpoint). Built on playwright-e2e-mcp and AutoHeal. MIT, no a
   keepgreen doctor
         check this project and machine
   keepgreen explore [--url <app>] [--start-command <cmd> --start-url <url>] [--pages /a,/b]
-                    [--max-flows 3] [--max-usd 3] [--runs 5] [--dry-run] [--out <dir>]
+                    [--flow "<sentence>" ...] [--max-flows 3] [--max-usd 3] [--runs 5]
+                    [--dry-run] [--out <dir>]
         find important user flows with no test yet and write a test for each; a test is kept
-        only if it makes real assertions and passes --runs times in a row
+        only if it makes real assertions and passes --runs times in a row. --flow skips the
+        planning and writes a test for the flow you name (repeat it for more)
   keepgreen heal [AutoHeal fix options]
         run your tests, fix what broke, leave the changes for you to review
   keepgreen autoheal <command> [...]
@@ -104,12 +107,13 @@ async function cmdExplore(argv: string[]): Promise<number> {
       framework: { type: 'string' },
       project: { type: 'string' },
       out: { type: 'string' },
+      flow: { type: 'string', multiple: true },
       'dry-run': { type: 'boolean' },
     },
     strict: true,
   });
   const projectRoot = path.resolve(values.project ?? '.');
-  const { project: _p, out: _o, 'dry-run': _d, ...flags } = values;
+  const { project: _p, out: _o, 'dry-run': _d, flow: _f, ...flags } = values;
   const config = resolveConfig(await loadConfigFile(projectRoot), flags as Record<string, string | undefined>);
   const env = process.env;
   // Lets playwright.config tell a KeepGreen run apart, e.g.
@@ -132,7 +136,12 @@ async function cmdExplore(argv: string[]): Promise<number> {
       appUrl = app.url;
     }
     if (!appUrl) throw new ConfigError('Tell KeepGreen where your app runs: --url http://localhost:3000, or url: in .keepgreen.yml (or start-command + start-url).');
-    checkAppUrl(appUrl);
+    // An app KeepGreen starts must be on this machine (startApp checks it). An app that is
+    // already running may be anywhere, such as a staging or preview deployment.
+    if (app) checkAppUrl(appUrl);
+    else checkRemoteUrl(appUrl);
+    const price = priceFor(provider.model, env) ?? (await lookupPrice(provider.model, env.AUTOHEAL_BASE_URL, { log }));
+    if (!price) log(`No price is known for ${provider.model}, so max-usd cannot be enforced (only a token cap). Set AUTOHEAL_PRICE_IN and AUTOHEAL_PRICE_OUT (USD per 1M tokens).`);
     log(`KeepGreen ${VERSION}: exploring ${appUrl} (${framework}, ${provider.name} ${provider.model}, limit $${config.maxUsd})`);
     engine = await McpTools.start(projectRoot);
     runner = framework === 'cypress' ? new CypressTools(projectRoot, { log }) : framework === 'webdriverio' ? new WdioTools(projectRoot, { log }) : engine;
@@ -147,11 +156,12 @@ async function cmdExplore(argv: string[]): Promise<number> {
       maxFlows: config.maxFlows,
       maxUsd: config.maxUsd,
       runs: config.runs,
-      price: priceFor(provider.model, env),
+      price,
       framework,
       cover,
       log,
       dryRun: values['dry-run'] === true,
+      ...(values.flow?.length ? { flows: values.flow } : {}),
     });
     const report = exploreReport(result, config.runs);
     process.stdout.write(`\n${report}\n`);
@@ -160,7 +170,18 @@ async function cmdExplore(argv: string[]): Promise<number> {
       const out = path.resolve(values.out);
       await mkdir(out, { recursive: true });
       await writeFile(path.join(out, 'report.md'), `${report}\n`);
-      await writeFile(path.join(out, 'summary.json'), `${JSON.stringify({ version: VERSION, written, flows: result.flows, usd: result.usd }, null, 2)}\n`);
+      await writeFile(path.join(out, 'summary.json'), `${JSON.stringify(
+          {
+            version: VERSION,
+            written,
+            flows: result.flows,
+            results: result.results.map(({ flow, result: r }) => ({ flow: flow.flow, status: r.status, file: r.file, explanation: r.explanation })),
+            usd: result.usd,
+            priced: result.priced,
+          },
+          null,
+          2,
+        )}\n`);
       await writeFile(path.join(out, 'new-tests.patch'), await newFilesPatch(projectRoot, written));
       log(`Wrote ${path.relative(process.cwd(), out) || '.'}/report.md, summary.json and new-tests.patch`);
     }
@@ -171,6 +192,19 @@ async function cmdExplore(argv: string[]): Promise<number> {
     await engine?.close();
     await app?.stop().catch(() => undefined);
   }
+}
+
+/** A running app to explore: any http(s) address without a user name or password in it. */
+export function checkRemoteUrl(url: string): URL {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    throw new ConfigError(`url is not a URL: ${url}`);
+  }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new ConfigError('url must start with http:// or https://');
+  if (u.username || u.password) throw new ConfigError('Do not put a user name or password in url.');
+  return u;
 }
 
 async function cmdInit(argv: string[]): Promise<number> {

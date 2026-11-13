@@ -24,7 +24,13 @@ every prompt marks such text as data.
   one of `runs` runs in a row. The scans are pattern based, so every test still arrives as a PR
   for a person to review.
 - **Pages stay on your app.** Planning only opens the app URL and the paths you list in
-  `pages:`; `cover` only opens pages on the same origin.
+  `pages:`; `cover` only opens pages on the same origin. An app KeepGreen starts must be on the
+  same machine; an app that is already running (`url:`) may be a staging or preview deployment.
+  Point KeepGreen at a test environment, never production: the tests it writes really click.
+- **No pings from AI text.** `@name` in AI-written flow text is defused before it goes into a PR.
+- **Optional PR token.** `KEEPGREEN_PR_TOKEN` (so your CI runs on KeepGreen's PRs) is only given
+  to the publish job, which never runs your project's code. Make it fine-grained, for this repo
+  only, with Contents and Pull requests access.
 - **Spend cap.** One `max-usd` limit covers a whole explore run (planning plus every flow).
 
 ## Your part

@@ -23,6 +23,10 @@ inputs:
     description: Address to wait for after start-command
     required: false
     default: ""
+  flows:
+    description: Flows to write tests for, one sentence per line (skips planning; blank = let the AI pick)
+    required: false
+    default: ""
   max-flows:
     description: New tests to try (1-10; blank = .keepgreen.yml or 3)
     required: false
@@ -70,7 +74,7 @@ inputs:
   version:
     description: keepgreen version from npm
     required: false
-    default: "0.1.1"
+    default: "0.2.0"
 
 outputs:
   written:
@@ -98,6 +102,7 @@ runs:
         KG_MAX_FLOWS: ${{ inputs.max-flows }}
         KG_MAX_USD: ${{ inputs.max-usd }}
         KG_RUNS: ${{ inputs.runs }}
+        KG_FLOWS: ${{ inputs.flows }}
         OUT: ${{ github.workspace }}/keepgreen-out
       run: |
         [ -n "$ANTHROPIC_API_KEY" ] || unset ANTHROPIC_API_KEY
@@ -117,6 +122,10 @@ runs:
         [ -n "$KG_MAX_FLOWS" ] && args+=(--max-flows "$KG_MAX_FLOWS")
         [ -n "$KG_MAX_USD" ] && args+=(--max-usd "$KG_MAX_USD")
         [ -n "$KG_RUNS" ] && args+=(--runs "$KG_RUNS")
+        while IFS= read -r line; do
+          line="${line#"${line%%[![:space:]]*}"}"
+          [ -n "$line" ] && args+=(--flow "$line")
+        done <<< "$KG_FLOWS"
         set +e
         npx -y "keepgreen@$KG_VERSION" "${args[@]}"
         code=$?
