@@ -32,7 +32,7 @@ services:
 
   dashboard:
     build:
-      context: https://github.com/xsignon-secure/AutoHeal-AI.git#v0.14.0
+      context: https://github.com/xsignon-secure/AutoHeal-AI.git#v0.15.0
     restart: unless-stopped
     environment:
       AUTOHEAL_DASHBOARD_SECRET: ${AUTOHEAL_DASHBOARD_SECRET:?set AUTOHEAL_DASHBOARD_SECRET in .env}

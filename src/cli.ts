@@ -9,7 +9,8 @@
 
 import { spawnSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
-import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createInterface } from 'node:readline/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -37,6 +38,7 @@ import {
 import { ConfigFileError, loadConfigFile, resolveConfig } from './config.js';
 import { existingTitles, explore, exploreReport } from './explore.js';
 import { init } from './init.js';
+import { PROVIDER_LABEL, SECRET_NAME, connectGithub, detectProvider, githubReady, githubRepo, healWorkflowText, setupChecks, type GithubStep, type Provider } from './setup.js';
 import { newFilesPatch } from './newfiles.js';
 import { checkPatch } from './patch.js';
 import { lookupPrice } from './price.js';
@@ -46,8 +48,13 @@ export const USAGE = `keepgreen ${VERSION}: free, self-hosted AI test agent. It 
 for your app and fixes the ones that break, with your own AI key (Anthropic, OpenAI or any
 OpenAI-compatible endpoint). Built on playwright-e2e-mcp and AutoHeal. MIT, no account, no telemetry.
 
-  keepgreen init [--force] [--dry-run]
-        write .keepgreen.yml, the explore workflow and AutoHeal's heal workflow (GitHub Actions)
+Start here: npx keepgreen init
+
+  keepgreen init [--provider anthropic|openai|openrouter] [--url <app> | --start-command <cmd>
+                 --start-url <url>] [--github | --no-github] [--force] [--dry-run]
+        set everything up in one go: finds where your app runs and how CI installs it, writes
+        .keepgreen.yml, the explore workflow and AutoHeal's heal workflow, and (with the gh CLI)
+        adds your AI key secret and lets Actions open PRs
   keepgreen doctor
         check this project and machine
   keepgreen explore [--url <app>] [--start-command <cmd> --start-url <url>] [--pages /a,/b]
@@ -70,6 +77,8 @@ OpenAI-compatible endpoint). Built on playwright-e2e-mcp and AutoHeal. MIT, no a
 Settings come from .keepgreen.yml; flags win. The AI key comes from ANTHROPIC_API_KEY,
 OPENAI_API_KEY (+ AUTOHEAL_MODEL) or AUTOHEAL_BASE_URL (+ AUTOHEAL_MODEL).
 `;
+
+const HEAL_WORKFLOW = '.github/workflows/autoheal.yml';
 
 const log = (line: string) => process.stderr.write(`[keepgreen] ${line}\n`);
 
@@ -234,28 +243,110 @@ export function checkRemoteUrl(url: string): URL {
   return u;
 }
 
+async function ask(question: string): Promise<boolean> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = (await rl.question(question)).trim().toLowerCase();
+    return answer === '' || answer === 'y' || answer === 'yes';
+  } finally {
+    rl.close();
+  }
+}
+
 async function cmdInit(argv: string[]): Promise<number> {
-  const { values } = parseArgs({ args: argv, options: { project: { type: 'string' }, force: { type: 'boolean' }, 'dry-run': { type: 'boolean' } }, strict: true });
+  const { values } = parseArgs({
+    args: argv,
+    options: {
+      project: { type: 'string' },
+      force: { type: 'boolean' },
+      'dry-run': { type: 'boolean' },
+      provider: { type: 'string' },
+      url: { type: 'string' },
+      'start-command': { type: 'string' },
+      'start-url': { type: 'string' },
+      github: { type: 'boolean' },
+      'no-github': { type: 'boolean' },
+    },
+    strict: true,
+  });
   const root = path.resolve(values.project ?? '.');
   const dryRun = values['dry-run'] === true;
-  const r = await init(root, { force: values.force === true, dryRun });
-  const out = [`KeepGreen ${VERSION}`, ''];
-  for (const w of r.written) out.push(`${dryRun ? 'would write' : 'wrote'}   ${w}`);
-  for (const w of r.skipped) out.push(`kept    ${w} (exists; --force to overwrite)`);
-  out.push('', 'Now AutoHeal sets up healing:', '');
+  let provider: Provider;
+  try {
+    provider = detectProvider(process.env, values.provider);
+  } catch (error) {
+    throw new ConfigError((error as Error).message);
+  }
+  if (values.url) checkRemoteUrl(values.url);
+  if (values['start-command'] && !values['start-url'] && !values.url) throw new ConfigError('--start-command needs --start-url (the address to wait for).');
+  const target = {
+    ...(values.url ? { url: values.url } : {}),
+    ...(values['start-command'] ? { startCommand: values['start-command'] } : {}),
+    ...(values['start-url'] ? { startUrl: values['start-url'] } : {}),
+  };
+  const healFile = path.join(root, HEAL_WORKFLOW);
+  const healExisted = await access(healFile).then(() => true, () => false);
+  const r = await init(root, { force: values.force === true, dryRun, provider, target });
+
+  // AutoHeal writes the heal workflow. Its own "what to do next" list is
+  // replaced by KeepGreen's below; only its checks of the test setup are kept.
+  const ah = spawnSync(process.execPath, [autohealCli(), 'init', '--ci', 'github', '--project', root, ...(values.force ? ['--force'] : []), ...(dryRun ? ['--dry-run'] : [])], { encoding: 'utf8' });
+  if (ah.error) throw ah.error;
+  const code = ah.status ?? 1;
+  if (code !== 0) process.stderr.write(`${ah.stdout ?? ''}${ah.stderr ?? ''}`);
+  const checks = setupChecks(ah.stdout ?? '');
+  const healWritten = !dryRun && (!healExisted || values.force === true);
+  if (healWritten) {
+    const text = await readFile(healFile, 'utf8').catch(() => '');
+    if (text) await writeFile(healFile, healWorkflowText(text, { provider, target: r.target }));
+  }
+
+  const t = r.target;
+  const out = ['', `━━ KeepGreen ${VERSION} is set up ━━`, ''];
+  out.push(`  App      ${t.startCommand ? `starts with "${t.startCommand}", then ${t.startUrl}` : t.url}   (${t.from})`);
+  out.push(`  AI       ${PROVIDER_LABEL[provider]}, your own key in the secret ${SECRET_NAME[provider]}`);
+  out.push(`  Installs ${r.pm}`);
+  for (const w of r.written) out.push(`  ${dryRun ? 'would write' : 'wrote'}    ${w}`);
+  if (healWritten) out.push(`  wrote    ${HEAL_WORKFLOW} (by AutoHeal)`);
+  for (const w of r.skipped) out.push(`  kept     ${w} (exists; --force to overwrite)`);
+  if (t.webServerNeedsReuse) {
+    out.push('', "  Tip: playwright.config starts the app too. Let it reuse the one KeepGreen starts:", '       reuseExistingServer: !process.env.CI || !!process.env.KEEPGREEN');
+  }
+
+  if (checks.length) {
+    out.push('', '  Your test setup (AutoHeal needs these to fix tests in CI):');
+    for (const c of checks) out.push(`    ${c}`);
+  }
+
+  let ghSteps: GithubStep[] = [];
+  const remote = spawnSync('git', ['-C', root, 'remote', 'get-url', 'origin'], { encoding: 'utf8' });
+  const repo = remote.status === 0 ? githubRepo(remote.stdout ?? '') : undefined;
+  if (!dryRun && values['no-github'] !== true) {
+    const ready = githubReady(root);
+    const tty = process.stdin.isTTY === true && process.stdout.isTTY === true;
+    if (ready.why) {
+      if (values.github) out.push('', `  GitHub   not connected: ${ready.why}`);
+    } else if (ready.repo && (values.github || (tty && (await ask(`\nAdd your AI key to ${ready.repo} and let Actions open PRs, using the gh CLI? [Y/n] `))))) {
+      ghSteps = connectGithub({ repo: ready.repo, provider, env: process.env, interactive: tty });
+      out.push('', `  GitHub   ${ready.repo}`);
+      for (const s of ghSteps) out.push(`    ${s.ok ? '✓' : '✗'} ${s.what}${s.fix ? `\n        do it here: ${s.fix}` : ''}`);
+    }
+  }
+
+  const web = repo ? `https://github.com/${repo}` : undefined;
+  const todo: string[] = [];
+  if (!ghSteps.length) {
+    todo.push(`Add your ${PROVIDER_LABEL[provider]} key as the repository secret ${SECRET_NAME[provider]}${web ? `: ${web}/settings/secrets/actions/new` : ''}`);
+    todo.push(`Settings > Actions > General > Workflow permissions: tick "Allow GitHub Actions to create and approve pull requests"${web ? ` (${web}/settings/actions)` : ''}`);
+    if (provider === 'openai') todo.push(`Add the repository variable AUTOHEAL_MODEL with your OpenAI model${web ? `: ${web}/settings/variables/actions/new` : ''}`);
+    if (values['no-github'] !== true) todo.push('(or let KeepGreen do these two: install the gh CLI, then run `npx keepgreen init --github`)');
+  }
+  todo.push('git add .keepgreen.yml .github .gitignore && git commit -m "Add KeepGreen" && git push');
+  todo.push(`Run it: ${web ? `${web}/actions/workflows/keepgreen-explore.yml` : 'Actions > KeepGreen explore'} > Run workflow. You get one PR with new, proven tests.`);
+  out.push('', '  Next:');
+  todo.forEach((s, i) => out.push(`    ${i + 1}. ${s}`));
+  out.push('', '  Try it on this machine first: npx keepgreen explore --dry-run   (plans flows, writes nothing)', '');
   process.stdout.write(out.join('\n'));
-  const code = runAutoheal(['init', '--ci', 'github', '--project', root, ...(values.force ? ['--force'] : []), ...(dryRun ? ['--dry-run'] : [])]);
-  process.stdout.write(
-    [
-      '',
-      'For KeepGreen explore, also:',
-      '  1. Set url: in .keepgreen.yml (or start-command + start-url) so KeepGreen can reach your app.',
-      '  2. Add ANTHROPIC_API_KEY (or OPENAI_API_KEY + the AUTOHEAL_MODEL variable) as a repository secret.',
-      '  3. Settings > Actions > General: allow GitHub Actions to create pull requests.',
-      '  4. Run it: Actions > KeepGreen explore > Run workflow (or `npx keepgreen explore` on your machine).',
-      '',
-    ].join('\n'),
-  );
   return code;
 }
 

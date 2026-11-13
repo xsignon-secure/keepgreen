@@ -4,20 +4,22 @@
 
 <h1 align="center">KeepGreen</h1>
 
-<p align="center"><b>The AI test agent that writes, fixes and keeps your end-to-end tests green.</b><br>
+<p align="center"><b>🤖 GaaS for end-to-end testing: your own AI QA engineer, live in 60 seconds.</b><br>
+<b>The AI test agent that writes, fixes and keeps your end-to-end tests green.</b><br>
 It finds the user flows nobody tests, writes a test for each, and fixes tests when your UI changes.<br>
 Every test it keeps <b>proved itself</b>: real assertions, green run after run.</p>
 
 <p align="center">
 
-[![npm](https://img.shields.io/npm/v/keepgreen?color=059669)](https://www.npmjs.com/package/keepgreen) [![npm downloads](https://img.shields.io/npm/dm/keepgreen?color=059669)](https://www.npmjs.com/package/keepgreen) [![CI](https://github.com/xsignon-secure/keepgreen/actions/workflows/ci.yml/badge.svg)](https://github.com/xsignon-secure/keepgreen/actions/workflows/ci.yml) [![npm provenance](https://img.shields.io/badge/npm-provenance-059669)](https://www.npmjs.com/package/keepgreen#provenance) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![100% free](https://img.shields.io/badge/price-100%25%20free-16a34a)](#-free-forever)
+[![npm](https://img.shields.io/npm/v/keepgreen?color=059669)](https://www.npmjs.com/package/keepgreen) [![npm downloads](https://img.shields.io/npm/dm/keepgreen?color=059669)](https://www.npmjs.com/package/keepgreen) [![CI](https://github.com/xsignon-secure/keepgreen/actions/workflows/ci.yml/badge.svg)](https://github.com/xsignon-secure/keepgreen/actions/workflows/ci.yml) [![npm provenance](https://img.shields.io/badge/npm-provenance-059669)](https://www.npmjs.com/package/keepgreen#provenance) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![100% free](https://img.shields.io/badge/price-100%25%20free-16a34a)](#-free-forever) [![GaaS](https://img.shields.io/badge/GaaS-agentic%20AI%20as%20a%20service-7c3aed)](#-gaas-ai-testing-as-a-service-without-the-service)
 
 </p>
 
 <p align="center">⭐ <b>If KeepGreen saves you a test-writing afternoon, <a href="https://github.com/xsignon-secure/keepgreen">a star</a> helps other teams find it.</b></p>
 
 <p align="center">
-  <a href="#-quick-start">Quick start</a> ·
+  <a href="#-start-in-60-seconds">Start in 60 seconds</a> ·
+  <a href="#-gaas-ai-testing-as-a-service-without-the-service">GaaS</a> ·
   <a href="#-github-actions">GitHub Actions</a> ·
   <a href="#-how-explore-works">How it works</a> ·
   <a href="#%EF%B8%8F-settings">Settings</a> ·
@@ -29,6 +31,55 @@ KeepGreen runs **on your own CI runner or laptop, with your own AI key**: Anthro
 OpenRouter, or any OpenAI-compatible endpoint including local models. There is no KeepGreen
 server, no account and no telemetry. You pay only your AI provider, and one spend cap covers
 every run.
+
+## 🚀 GaaS: AI testing as a service, without the service
+
+**GaaS** means Generative and Agentic AI as a Service. KeepGreen gives you the "as a service"
+part, an AI agent that does a QA engineer's job on every red build and every week, **without** the parts you
+don't want: no vendor, no account, no seat price, no platform holding your code.
+
+| | Typical hosted AI testing tools | **KeepGreen GaaS** |
+| --- | --- | --- |
+| Setup | sign-up, SDK or app install, dashboard | **`npx keepgreen init`** |
+| Who runs the agent | their cloud | **your GitHub Actions runner** |
+| Your code and app | sent to their cloud | **stays in your CI** (only your AI provider sees the prompts) |
+| Price | per seat or per test run | **free (MIT)**, you pay only your AI key |
+| A real run on our demo shop | | **2 new tests, about $0.04** |
+| What lands in your repo | depends on the tool | **only tests that passed every run and the anti-cheat guard** |
+
+One command turns your repository into a self-driving test team:
+
+- 🔍 **It explores.** It opens your app, finds the important flows nobody tested, and writes the tests.
+- 🩹 **It heals.** When a UI change breaks a test, it opens a fix PR with proof. Real app bugs are reported, not hidden.
+- 🔐 **It signs in.** Flows behind a login are covered too. Passwords stay in your CI secrets.
+- 🛡️ **It can't cheat.** Tests that can't fail, skips, fake network answers and deleted assertions are thrown away.
+- 💸 **It can't overspend.** One `max-usd` cap per run, on your own key.
+
+## ⚡ Start in 60 seconds
+
+In your project folder, with your AI key in the shell (Anthropic, OpenAI or OpenRouter):
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...     # or OPENAI_API_KEY, or OPENROUTER_API_KEY
+npx keepgreen init                      # 1. sets everything up
+git add . && git commit -m "Add KeepGreen" && git push   # 2. ship it
+```
+
+**3.** Open *Actions > KeepGreen explore > Run workflow*. A few minutes later you get **one PR
+with new, proven tests**.
+
+What `init` does for you:
+
+- finds where your app runs (`playwright.config` webServer or baseURL, or your `dev`/`start`
+  script and its port) and how CI installs it (npm, pnpm, yarn or pip),
+- writes `.keepgreen.yml`, the explore workflow and AutoHeal's heal workflow, set to your AI
+  provider,
+- with the [GitHub CLI](https://cli.github.com) signed in, it asks to add your key as a repository
+  secret and to let Actions open PRs. The key goes straight to GitHub and is never printed.
+  Without `gh`, it prints the two links to click.
+
+Want to see it first? `npx keepgreen explore --dry-run` plans the flows on your machine and
+writes nothing.
 
 ## ❌ Without it / ✅ With it
 
@@ -70,13 +121,12 @@ KeepGreen joins two XSignOn projects into one agent:
 stable locators, runs tests, reads failures) and [AutoHeal](https://github.com/xsignon-secure/AutoHeal-AI)
 is the guarded fixer and test writer.
 
-## ⚡ Quick start
+## 💻 On your machine
 
 ```bash
 npm install -D keepgreen              # or use npx keepgreen ... without installing
 export ANTHROPIC_API_KEY=sk-ant-...   # your own key
-npx keepgreen init                    # writes .keepgreen.yml + workflows, checks your setup
-npx keepgreen explore --url http://localhost:3000
+npx keepgreen explore                 # uses the app found by init (.keepgreen.yml)
 ```
 
 Explore prints a table of the flows it tried and which tests it kept. New files are named after
@@ -113,14 +163,15 @@ npx keepgreen heal
 - **`.github/workflows/autoheal.yml`** is written by AutoHeal's own `init`. It runs after your
   test workflow fails and opens a fix PR.
 
-Then:
+`init` sets both to your package manager and AI provider. With `gh` it also adds the key secret
+and the PR permission. By hand, that is:
 
-1. Add `ANTHROPIC_API_KEY` as a repository secret. For OpenAI, add `OPENAI_API_KEY` and a
-   repository variable `AUTOHEAL_MODEL`. For OpenRouter, see [below](#openrouter-or-any-openai-compatible-endpoint).
+1. Add your key as a repository secret: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` (plus a repository
+   variable `AUTOHEAL_MODEL`) or `OPENROUTER_API_KEY`.
 2. Go to *Settings > Actions > General > Workflow permissions* and tick "Allow GitHub Actions to
    create and approve pull requests".
-3. Make the explore job's install steps match your test workflow (Node or Python, browsers,
-   services).
+3. If your tests need services (a database, env vars), add them to the explore job like in your
+   test workflow.
 4. Optional: add a fine-grained token (this repo only; Contents and Pull requests: read and
    write) as the secret `KEEPGREEN_PR_TOKEN`. GitHub runs no CI on PRs opened with the built-in
    token; with this one, your checks run on KeepGreen's PRs.
@@ -128,7 +179,7 @@ Then:
 Or use the action directly:
 
 ```yaml
-- uses: xsignon-secure/keepgreen@v0.3.0
+- uses: xsignon-secure/keepgreen@v0.4.0
   with:
     url: http://localhost:3000
     anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -252,7 +303,8 @@ webServer: { command: 'npm run start', url: 'http://127.0.0.1:3000/', reuseExist
 ## 📖 All commands
 
 ```
-keepgreen init [--force] [--dry-run]
+keepgreen init [--provider anthropic|openai|openrouter] [--url <app> | --start-command <cmd>
+               --start-url <url>] [--github | --no-github] [--force] [--dry-run]
 keepgreen doctor
 keepgreen explore [--url <app>] [--start-command <cmd> --start-url <url>] [--pages /a,/b]
                   [--flow "<sentence>" ...] [--max-flows 3] [--max-usd 3] [--runs 5]

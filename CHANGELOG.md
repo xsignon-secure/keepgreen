@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0
+
+KeepGreen as GaaS in 60 seconds: one command sets everything up.
+
+- **`keepgreen init` fills everything in.** It finds where your app runs (`playwright.config` `webServer` or `baseURL`, else your `dev` / `start` script and the usual port of the tool it runs, or Django's `manage.py`) and writes it into `.keepgreen.yml`. It sets the explore workflow's install steps to npm, pnpm, yarn or pip, and both workflows (explore and AutoHeal's heal) to your AI provider. The heal workflow also starts your app, so the AI checks locators on the real page.
+- **AI provider from your environment.** `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`, or `--provider`. OpenRouter needs no model variable (default `anthropic/claude-sonnet-5.5`; set `AUTOHEAL_MODEL` to change it).
+- **GitHub's side too, with the gh CLI.** `init` asks (or `--github`) to add your key as the repository secret and to let GitHub Actions open pull requests. The key goes to `gh` on stdin, or into gh's own hidden prompt, and is never printed or passed as an argument. Anything it cannot do (for example an organisation policy) comes with the link to do it by hand. `--no-github` skips it.
+- **A short, clear summary** instead of two lists: what was found, what was written, the problems in your test setup that AutoHeal needs fixed, and the next steps with direct links to your repository's settings and the Run workflow page.
+- `--url`, `--start-command` and `--start-url` on `init` override what it finds.
+- AutoHeal 0.15.0 inside: the heal job can sign in to your app. The self-host bundle builds the dashboard from AutoHeal v0.15.0.
+- README: what GaaS means here, and "Start in 60 seconds".
+
 ## 0.3.0
 
 - **Flows behind a login.** `login-url`, `login-steps`, `login-check` and `login-totp-env` in `.keepgreen.yml` (or `--login-*` flags): KeepGreen signs in once through playwright-e2e-mcp's `save-login`, plans with the pages a signed-in user sees, and every new test loads the same session. Secrets are `{{env:NAME}}` and 2FA codes `{{totp}}`, typed by the browser engine; the AI, the logs and the tests never see them. `session:` alone reuses a session your Playwright setup project makes. Playwright and pytest-playwright.
