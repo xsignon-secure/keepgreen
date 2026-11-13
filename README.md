@@ -127,7 +127,7 @@ Then:
 Or use the action directly:
 
 ```yaml
-- uses: xsignon-secure/keepgreen@v0.2.0
+- uses: xsignon-secure/keepgreen@v0.2.1
   with:
     url: http://localhost:3000
     anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
