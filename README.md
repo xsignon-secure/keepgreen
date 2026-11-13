@@ -52,6 +52,7 @@ it's an app bug instead of "fixing" the test.
 | --- | --- | --- |
 | 🔍 **Explore** | Looks at your app, picks the most important user flows that have **no test yet**, and writes a test for each. A test is kept only if it makes real assertions and passes every run (5 by default). | `npx keepgreen explore` |
 | 🎯 **Explore one flow** | Skip the planning: name the flow, get the test. | `npx keepgreen explore --flow "..."` |
+| 🔐 **Behind a login** | Signs in once (2FA too), plans and writes tests as that user. Secrets stay in your environment. | `login-steps:` in `.keepgreen.yml` |
 | 🩹 **Heal** | Runs your tests, finds what broke, fixes it and proves the fix. App bugs are reported, not "fixed". | `npx keepgreen heal` (local) · AutoHeal workflow (CI) |
 
 - **Anti-cheat guard.** Tests without real assertions, or with skips, faked network answers,
@@ -127,7 +128,7 @@ Then:
 Or use the action directly:
 
 ```yaml
-- uses: xsignon-secure/keepgreen@v0.2.1
+- uses: xsignon-secure/keepgreen@v0.3.0
   with:
     url: http://localhost:3000
     anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -203,6 +204,42 @@ For other endpoints, set `AUTOHEAL_PRICE_IN` and `AUTOHEAL_PRICE_OUT`.
 In the Action: `base-url: https://openrouter.ai/api/v1`, `api-key: ${{ secrets.OPENROUTER_API_KEY }}`
 and `model: ...`.
 
+### Flows behind a login
+
+Most important flows need a signed-in user. Add the login steps to `.keepgreen.yml`:
+
+```yaml
+login-url: /login
+login-steps:
+  - fill getByLabel('Email') = {{env:E2E_USER}}
+  - fill getByLabel('Password') = {{env:E2E_PASSWORD}}
+  - click getByRole('button', { name: 'Sign in' })
+login-check: getByRole('button', { name: 'Sign out' })   # only a signed-in user sees it
+# login-totp-env: E2E_TOTP_SECRET                         # if a step types {{totp}} (2FA)
+# session: playwright/.auth/user.json                     # where the session is saved
+```
+
+KeepGreen signs in once through playwright-e2e-mcp's `save-login`, looks at your pages as that
+user, plans flows that keep the session valid (no logging out or account changes), and every new
+test loads the same session with `test.use({ storageState })` (pytest: `browser_context_args`).
+
+- **Secrets stay out of everything.** `{{env:E2E_PASSWORD}}` is filled in by the browser engine
+  at the moment it is typed; the AI, the logs and the test files never see it. Only variables
+  named `E2E_*`, `TEST_*`, `PW_*`, `PLAYWRIGHT_*` or `LOGIN_*` can be used, and a step that types
+  a password as plain text is refused.
+- **A failed login stops the run** before any AI spend.
+- **Already make a session** in a [Playwright setup project](https://playwright.dev/docs/auth)?
+  Set just `session: playwright/.auth/user.json` and run the setup project first.
+- **Your CI must create the same session** before the new tests run, usually with that setup
+  project. Keep the session file in `.gitignore`; KeepGreen never commits it.
+- In the Action, pass the secrets as `env:` on the KeepGreen step (`E2E_USER: ${{ secrets.E2E_USER }}`).
+- Steps: `goto`, `fill <locator> = <value>`, `press <locator> = <key>`, `select <locator> = <option>`,
+  `click`, `dblclick`, `hover`, `check`, `uncheck`, `wait <locator>` or `wait <ms>`. Quote a
+  step that has ` #` in it (a CSS id), or YAML reads the rest as a comment.
+
+The same works with flags: `--login-url`, `--login-step` (repeat it), `--login-check`,
+`--login-totp-env`, `--session`.
+
 ### Playwright `webServer`
 
 If your `playwright.config` starts the app with `webServer`, and KeepGreen starts it too
@@ -240,7 +277,8 @@ cd selfhost && sh make-env.sh your-org/your-repo && docker compose up -d --build
 
 See [SECURITY.md](SECURITY.md). In short: your key goes only to your AI provider, AI-written tests
 never run with a write token or your AI key, the publish step only accepts new test files, and
-every change arrives as a PR for a person to review. Forks never get your secrets.
+every change arrives as a PR for a person to review. Forks never get your secrets. Login
+passwords are typed by the browser engine from your environment and never reach the AI.
 
 ## 💚 Free forever
 

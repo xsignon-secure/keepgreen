@@ -20,3 +20,16 @@ max-usd: 3
 runs: 5
 # auto | playwright | pytest | cypress | webdriverio
 framework: auto
+
+# Flows behind a login (Playwright and pytest). KeepGreen signs in once, looks
+# at the pages as that user, and the new tests load the same session. Write
+# secrets as {{env:NAME}} (names starting E2E_, TEST_, PW_, PLAYWRIGHT_ or
+# LOGIN_) and set them as environment variables / CI secrets, never here.
+# login-url: /login
+# login-steps:
+#   - fill getByLabel('Email') = {{env:E2E_USER}}
+#   - fill getByLabel('Password') = {{env:E2E_PASSWORD}}
+#   - click getByRole('button', { name: 'Sign in' })
+# login-check: getByRole('button', { name: 'Sign out' })
+# login-totp-env: E2E_TOTP_SECRET    # only if a step types {{totp}}
+# session: playwright/.auth/user.json   # keep it in .gitignore

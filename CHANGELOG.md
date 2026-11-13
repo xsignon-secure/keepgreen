@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+- **Flows behind a login.** `login-url`, `login-steps`, `login-check` and `login-totp-env` in `.keepgreen.yml` (or `--login-*` flags): KeepGreen signs in once through playwright-e2e-mcp's `save-login`, plans with the pages a signed-in user sees, and every new test loads the same session. Secrets are `{{env:NAME}}` and 2FA codes `{{totp}}`, typed by the browser engine; the AI, the logs and the tests never see them. `session:` alone reuses a session your Playwright setup project makes. Playwright and pytest-playwright.
+- Planning with a session avoids flows that would end it (logging out, account changes).
+- AutoHeal 0.14.0 inside. The self-host bundle builds the history server from E2E v0.16.2 (append-only journal) and the dashboard from AutoHeal v0.14.0.
+
 ## 0.2.1
 
 - AutoHeal 0.13.0 inside (healing and test writing): OpenRouter works in AutoHeal's heal Action (`api-key` input), OpenRouter prices are looked up for healing too, and the engine is playwright-e2e-mcp 0.16.1 (Playwright 1.65, GitHub tokens kept out of test processes).

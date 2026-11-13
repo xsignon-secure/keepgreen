@@ -20,7 +20,7 @@ name: keepgreen
 services:
   history:
     build:
-      context: https://github.com/xsignon-secure/E2E.git#v0.16.1:history-server
+      context: https://github.com/xsignon-secure/E2E.git#v0.16.2:history-server
     restart: unless-stopped
     environment:
       HISTORY_TOKENS: ${HISTORY_TOKENS:?set HISTORY_TOKENS in .env}
@@ -32,7 +32,7 @@ services:
 
   dashboard:
     build:
-      context: https://github.com/xsignon-secure/AutoHeal-AI.git#v0.13.0
+      context: https://github.com/xsignon-secure/AutoHeal-AI.git#v0.14.0
     restart: unless-stopped
     environment:
       AUTOHEAL_DASHBOARD_SECRET: ${AUTOHEAL_DASHBOARD_SECRET:?set AUTOHEAL_DASHBOARD_SECRET in .env}

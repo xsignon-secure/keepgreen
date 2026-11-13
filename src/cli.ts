@@ -20,7 +20,9 @@ import {
   ProviderError,
   WdioTools,
   checkAppUrl,
+  checkLogin,
   cover,
+  ensureSession,
   frameworkSetting,
   isCypressProject,
   isPytestProject,
@@ -50,10 +52,13 @@ OpenAI-compatible endpoint). Built on playwright-e2e-mcp and AutoHeal. MIT, no a
         check this project and machine
   keepgreen explore [--url <app>] [--start-command <cmd> --start-url <url>] [--pages /a,/b]
                     [--flow "<sentence>" ...] [--max-flows 3] [--max-usd 3] [--runs 5]
+                    [--session <file>] [--login-url /login --login-step "<step>" ...
+                     --login-check "<locator>" --login-totp-env E2E_TOTP_SECRET]
                     [--dry-run] [--out <dir>]
         find important user flows with no test yet and write a test for each; a test is kept
         only if it makes real assertions and passes --runs times in a row. --flow skips the
-        planning and writes a test for the flow you name (repeat it for more)
+        planning and writes a test for the flow you name (repeat it for more). --login-step
+        signs in first (secrets as {{env:E2E_PASSWORD}}), so flows behind a login are tested
   keepgreen heal [AutoHeal fix options]
         run your tests, fix what broke, leave the changes for you to review
   keepgreen autoheal <command> [...]
@@ -108,13 +113,25 @@ async function cmdExplore(argv: string[]): Promise<number> {
       project: { type: 'string' },
       out: { type: 'string' },
       flow: { type: 'string', multiple: true },
+      session: { type: 'string' },
+      'login-url': { type: 'string' },
+      'login-step': { type: 'string', multiple: true },
+      'login-check': { type: 'string' },
+      'login-totp-env': { type: 'string' },
       'dry-run': { type: 'boolean' },
     },
     strict: true,
   });
   const projectRoot = path.resolve(values.project ?? '.');
   const { project: _p, out: _o, 'dry-run': _d, flow: _f, ...flags } = values;
-  const config = resolveConfig(await loadConfigFile(projectRoot), flags as Record<string, string | undefined>);
+  const config = resolveConfig(await loadConfigFile(projectRoot), flags);
+  if (config.login) {
+    try {
+      checkLogin(config.login);
+    } catch (error) {
+      throw new ConfigError(error instanceof Error ? error.message : String(error));
+    }
+  }
   const env = process.env;
   // Lets playwright.config tell a KeepGreen run apart, e.g.
   // reuseExistingServer: !process.env.CI || !!process.env.KEEPGREEN
@@ -122,6 +139,7 @@ async function cmdExplore(argv: string[]): Promise<number> {
   const provider = providerFromEnv(env);
   if (!provider) throw new ConfigError('keepgreen explore needs an AI key: set ANTHROPIC_API_KEY, OPENAI_API_KEY (and AUTOHEAL_MODEL) or AUTOHEAL_BASE_URL.');
   const framework = await detectFramework(projectRoot, config.framework);
+  if (config.login && framework !== 'playwright' && framework !== 'pytest') throw new ConfigError(`Signed-in flows work with Playwright and pytest-playwright tests; this project uses ${framework}.`);
 
   let app: StartedApp | null = null;
   let appUrl = config.url;
@@ -145,7 +163,16 @@ async function cmdExplore(argv: string[]): Promise<number> {
     log(`KeepGreen ${VERSION}: exploring ${appUrl} (${framework}, ${provider.name} ${provider.model}, limit $${config.maxUsd})`);
     engine = await McpTools.start(projectRoot);
     runner = framework === 'cypress' ? new CypressTools(projectRoot, { log }) : framework === 'webdriverio' ? new WdioTools(projectRoot, { log }) : engine;
+    let session: string | undefined;
+    if (config.login) {
+      try {
+        session = await ensureSession(engine, config.login, { projectRoot, appUrl, log });
+      } catch (error) {
+        throw new ConfigError(error instanceof Error ? error.message : String(error));
+      }
+    }
     const result = await explore({
+      ...(session ? { session } : {}),
       projectRoot,
       provider,
       engine,

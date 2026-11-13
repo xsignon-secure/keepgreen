@@ -119,6 +119,10 @@ jobs:
           # api-key: ${{ secrets.OPENROUTER_API_KEY }}
           # price-in: "3"    # USD per 1M tokens of your model, so max-usd is enforced
           # price-out: "15"
+        # Flows behind a login: the login steps in .keepgreen.yml read these.
+        # env:
+        #   E2E_USER: ${{ secrets.E2E_USER }}
+        #   E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: steps.keepgreen.outputs.written != '0' && steps.keepgreen.outputs.written != ''
         with:

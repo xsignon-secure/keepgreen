@@ -31,6 +31,8 @@ export interface PlanOptions {
   existing: string[];
   maxFlows: number;
   budget: Budget;
+  /** A signed-in session (storageState in the project): pages are seen, and tests written, as that user. */
+  session?: string;
   log?: (line: string) => void;
 }
 
@@ -80,7 +82,7 @@ export async function planFlows(options: PlanOptions): Promise<Flow[]> {
   const seen: string[] = [];
   for (const target of [...new Set(targets)]) {
     log(`Looking at ${target}`);
-    const page = await options.engine.call('inspect-page', { url: target }, 120_000);
+    const page = await options.engine.call('inspect-page', { url: target, ...(options.session ? { storageState: options.session } : {}) }, 120_000);
     if (!page.ok) {
       log(`Could not open ${target}: ${page.text.slice(0, 200)}`);
       continue;
@@ -93,6 +95,7 @@ export async function planFlows(options: PlanOptions): Promise<Flow[]> {
   const user = [
     `App: ${base.origin}`,
     `New flows wanted: up to ${options.maxFlows}`,
+    ...(options.session ? ['The pages below were seen as a signed-in user, and every new test runs signed in. Do not plan logging in, logging out, signing up or changing the password or account: the session must stay valid.'] : []),
     '',
     '## Existing tests',
     titles.length ? titles.map((t) => `- ${t}`).join('\n') : '(none yet)',
@@ -232,6 +235,7 @@ export async function explore(options: ExploreOptions): Promise<ExploreResult> {
         mcp: options.runner,
         framework: options.framework,
         runs: options.runs,
+        ...(options.session ? { session: options.session } : {}),
         log,
       });
     } catch (error) {
