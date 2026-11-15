@@ -28,7 +28,8 @@ const script = JSON.parse(readFileSync(join(root, 'scripts', 'ad-script.json'), 
 const voice = (id) => join(root, 'scripts', 'voice', `${id}.m4a`);
 const seconds = (file) => Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file], { encoding: 'utf8' }));
 
-let at = 0;
+const INTRO = 2.2; // the XSignOn shield opens the video, then flies to the corner
+let at = INTRO;
 const scenes = script.map((s, i) => {
   const start = at;
   const speech = seconds(voice(s.id));
@@ -36,7 +37,9 @@ const scenes = script.map((s, i) => {
   return { ...s, start, end: at, speechAt: start + LEAD };
 });
 const total = at;
-const logo = `data:image/png;base64,${readFileSync(join(root, 'docs', 'logo.png')).toString('base64')}`;
+const png = (name) => `data:image/png;base64,${readFileSync(join(root, 'docs', name)).toString('base64')}`;
+const logo = png('logo.png');
+const mark = png('xsignon-shield.png');
 
 async function frames(width, height) {
   const dir = mkdtempSync(join(tmpdir(), 'kg-ad-'));
@@ -50,9 +53,9 @@ async function frames(width, height) {
   });
   const fonts = await page.evaluate(() => document.fonts.check('700 40px "Google Sans"') && document.fonts.check('400 40px "Google Sans Code"'));
   if (!fonts) throw new Error('Google Sans did not load (is fonts.googleapis.com reachable?)');
-  await page.evaluate((src) => window.setLogo(src), logo);
-  await page.waitForFunction(() => document.getElementById('logo2').complete);
-  await page.evaluate(([s, t]) => window.setTiming(s, t), [scenes.map((s) => [s.id, s.start, s.end, s.caption]), total]);
+  await page.evaluate(([l, m]) => { window.setLogo(l); window.setMark(m); }, [logo, mark]);
+  await page.waitForFunction(() => document.getElementById('logo2').complete && document.getElementById('mark').complete);
+  await page.evaluate(([s, t, i]) => window.setTiming(s, t, i), [scenes.map((s) => [s.id, s.start, s.end, s.caption]), total, INTRO]);
   const count = Math.round(total * FPS);
   for (let i = 0; i < count; i++) {
     await page.evaluate((t) => window.render(t), i / FPS);

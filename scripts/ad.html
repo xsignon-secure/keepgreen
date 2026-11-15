@@ -38,12 +38,16 @@
   .col.us { border: 2px solid var(--green); box-shadow: 0 0 calc(var(--u) * 6) #10b98133; }
   .col h4 { font-size: calc(var(--u) * 2.6); font-weight: 700; margin-bottom: calc(var(--u) * 0.4); }
   .col.them { color: var(--muted); }
-  #caption { position: absolute; left: 50%; bottom: calc(var(--u) * 2.4); transform: translateX(-50%); width: min(90%, calc(var(--u) * 88)); text-align: center; font-size: calc(var(--u) * 2.3); font-weight: 500; line-height: 1.35; color: #fff; background: #000a; border-radius: calc(var(--u) * 1); padding: calc(var(--u) * 0.8) calc(var(--u) * 1.8); }
+  #caption { position: absolute; left: 50%; bottom: calc(var(--u) * 2.4); transform: translateX(-50%); width: min(86%, calc(var(--u) * 80)); text-align: center; font-size: calc(var(--u) * 2.3); font-weight: 500; line-height: 1.35; color: #fff; background: #000a; border-radius: calc(var(--u) * 1); padding: calc(var(--u) * 0.8) calc(var(--u) * 1.8); }
   #caption:empty { display: none; }
   .tall #caption { bottom: 20%; }
   .tall .scene { inset: 0 0 24% 0; }
   .row .mono { font-size: 0.88em; white-space: nowrap; }
   #s2 { gap: calc(var(--u) * 1.6); }
+  #s7 { gap: calc(var(--u) * 1.5); padding: calc(var(--u) * 2); }
+  #s7 .logo { width: calc(var(--u) * 9); height: calc(var(--u) * 9); }
+  #mark { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }
+  .by { font-size: calc(var(--u) * 1.8); color: var(--muted); letter-spacing: 0.02em; }
   .bar { position: absolute; left: 0; bottom: 0; height: calc(var(--u) * 0.6); background: var(--green); }
   .cursor { display: inline-block; width: 0.6em; background: var(--green); color: transparent; }
 </style>
@@ -127,8 +131,10 @@
     </div>
     <div class="cta">npx keepgreen init</div>
     <div class="small">⭐ github.com/xsignon-secure/keepgreen</div>
+    <div class="by">A product by XSignOn · xsignon.com</div>
   </div>
   <div id="caption"></div>
+  <img id="mark" alt="XSignOn">
   <div class="bar" id="bar"></div>
 </div>
 <script>
@@ -136,6 +142,7 @@
   // (from the voiceover lengths), then render(t) for every frame.
   let SCENES = [['s1', 0, 5, ''], ['s2', 5, 11, ''], ['s3', 11, 17, ''], ['s4', 17, 27, ''], ['s5', 27, 35, ''], ['s6', 35, 43, ''], ['s7', 43, 49, '']];
   let TOTAL = 49;
+  let INTRO = 0;
   const COMMAND = '$ npx keepgreen init';
   const clamp = (x) => Math.max(0, Math.min(1, x));
   function setUnit() {
@@ -145,7 +152,31 @@
     document.documentElement.style.setProperty('--u', `${u}px`);
     document.documentElement.classList.toggle('tall', h > w);
   }
-  window.setTiming = (scenes, total) => { SCENES = scenes; TOTAL = total; window.TOTAL = total; };
+  window.setTiming = (scenes, total, intro = 0) => { SCENES = scenes; TOTAL = total; INTRO = intro; window.TOTAL = total; };
+  const ease = (x) => 1 - Math.pow(1 - clamp(x), 3);
+  const back = (x) => { x = clamp(x); const c = 1.7; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+  // XSignOn shield: pops in at the centre, then flies to the bottom-right corner and stays there.
+  function drawMark(t) {
+    const m = document.getElementById('mark');
+    if (!m.naturalWidth) return;
+    const w = innerWidth, h = innerHeight, tall = h > w;
+    const u = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--u'));
+    const ratio = m.naturalHeight / m.naturalWidth;
+    const bigW = (tall ? 34 : 24) * u, smallW = (tall ? 6.5 : 4.6) * u;
+    const big = { x: (w - bigW) / 2, y: (h - bigW * ratio) / 2, s: bigW };
+    const small = { x: w - smallW - 2.2 * u, y: h - smallW * ratio - 2.2 * u, s: smallW };
+    let x = small.x, y = small.y, s = small.s, o = 0.92;
+    if (INTRO > 0 && t < INTRO) {
+      const pop = INTRO * 0.3, hold = INTRO * 0.62;
+      if (t < pop) { const k = back(t / pop); s = big.s * (0.4 + 0.6 * k); x = (w - s) / 2; y = (h - s * ratio) / 2; o = clamp(t / (pop * 0.6)); }
+      else if (t < hold) { x = big.x; y = big.y; s = big.s; o = 1; }
+      else { const k = ease((t - hold) / (INTRO - hold)); x = big.x + (small.x - big.x) * k; y = big.y + (small.y - big.y) * k; s = big.s + (small.s - big.s) * k; o = 1 - 0.08 * k; }
+    }
+    m.style.width = `${s}px`;
+    m.style.opacity = String(o);
+    m.style.transform = `translate(${x}px, ${y}px)`;
+    m.style.filter = t < INTRO ? `drop-shadow(0 0 ${(1 - clamp((t - INTRO * 0.62) / (INTRO * 0.38))) * 3 * u}px #ffffff55)` : 'none';
+  }
   window.render = (t) => {
     setUnit();
     let caption = '';
@@ -172,9 +203,11 @@
       }
     });
     document.getElementById('caption').textContent = caption;
+    drawMark(t);
     document.getElementById('bar').style.width = `${clamp(t / TOTAL) * 100}%`;
   };
   window.TOTAL = TOTAL;
+  window.setMark = (src) => { document.getElementById('mark').src = src; };
   window.setLogo = (src) => { for (const id of ['logo2']) document.getElementById(id).src = src; };
   render(0);
 </script>
