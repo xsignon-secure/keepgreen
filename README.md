@@ -15,6 +15,11 @@ Every test it keeps <b>proved itself</b>: real assertions, green run after run.<
 
 </p>
 
+<p align="center">
+  <a href="https://github.com/xsignon-secure/keepgreen/raw/main/docs/keepgreen-ad.mp4"><img src="https://raw.githubusercontent.com/xsignon-secure/keepgreen/main/docs/keepgreen-ad.gif" alt="KeepGreen ad: GaaS, agentic AI as a service for end-to-end tests. One command sets it up, the agent opens a PR with new tests, AutoHeal fixes a broken locator, and it all runs free in your own CI" width="720"></a>
+  <br><sub>🔊 <b><a href="https://github.com/xsignon-secure/keepgreen/raw/main/docs/keepgreen-ad.mp4">Watch with voiceover</a></b> · <a href="https://github.com/xsignon-secure/keepgreen/raw/main/docs/keepgreen-ad-vertical.mp4">Vertical for Reels and Shorts</a> · made with <code>node scripts/gen-ad.mjs</code></sub>
+</p>
+
 <p align="center">⭐ <b>If KeepGreen saves you a test-writing afternoon, <a href="https://github.com/xsignon-secure/keepgreen">a star</a> helps other teams find it.</b></p>
 
 <p align="center">

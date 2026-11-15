@@ -1,0 +1,182 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Google+Sans+Code:wght@400;600&display=block" rel="stylesheet">
+<style>
+  :root { --green: #10b981; --green2: #059669; --bg: #07130f; --card: #0f1f19; --text: #ecfdf5; --muted: #8fb5a6; --red: #ef4444; --violet: #a78bfa; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text); font-family: "Google Sans", sans-serif; overflow: hidden; }
+  .mono, .term, .cta { font-family: "Google Sans Code", monospace; }
+  #stage { position: relative; width: 100%; height: 100%; background: radial-gradient(ellipse at 50% 0%, #0d3a2a 0%, var(--bg) 65%); }
+  .scene { position: absolute; inset: 0 0 calc(var(--u) * 9) 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--u) * 2.2); padding: calc(var(--u) * 4); text-align: center; opacity: 0; }
+  .big { font-size: calc(var(--u) * 5.6); font-weight: 700; line-height: 1.12; letter-spacing: -0.02em; }
+  .huge { font-size: calc(var(--u) * 9); font-weight: 700; line-height: 1; letter-spacing: -0.03em; }
+  .mid { font-size: calc(var(--u) * 3.2); font-weight: 700; line-height: 1.2; }
+  .small { font-size: calc(var(--u) * 2.2); color: var(--muted); line-height: 1.35; }
+  .green { color: var(--green); } .red { color: var(--red); } .violet { color: var(--violet); }
+  .term { width: min(92%, calc(var(--u) * 80)); background: #020806; border: 1px solid #1d3a2f; border-radius: calc(var(--u) * 1.2); padding: calc(var(--u) * 2.2) calc(var(--u) * 2.6); text-align: left; font-size: calc(var(--u) * 2.25); line-height: 1.6; box-shadow: 0 0 calc(var(--u) * 6) #10b98122; }
+  .dots { display: flex; gap: calc(var(--u) * 0.8); margin-bottom: calc(var(--u) * 1.4); }
+  .dots i { width: calc(var(--u) * 1.2); height: calc(var(--u) * 1.2); border-radius: 50%; display: block; }
+  .dots i:nth-child(1) { background: #ef4444; } .dots i:nth-child(2) { background: #f59e0b; } .dots i:nth-child(3) { background: #10b981; }
+  .pr { width: min(92%, calc(var(--u) * 76)); background: var(--card); border: 1px solid #1d3a2f; border-radius: calc(var(--u) * 1.4); padding: calc(var(--u) * 2.6); text-align: left; box-shadow: 0 0 calc(var(--u) * 6) #10b98133; }
+  .pr h3 { font-size: calc(var(--u) * 2.7); font-weight: 700; display: flex; align-items: center; gap: calc(var(--u) * 1.2); }
+  .badge { font-size: calc(var(--u) * 1.6); background: var(--green2); color: white; border-radius: 999px; padding: calc(var(--u) * 0.3) calc(var(--u) * 1.2); font-weight: 700; }
+  .row { font-size: calc(var(--u) * 2.2); margin-top: calc(var(--u) * 1.3); display: flex; gap: calc(var(--u) * 1.2); align-items: center; opacity: 0; }
+  .ci { display: inline-flex; align-items: center; gap: calc(var(--u) * 1); font-size: calc(var(--u) * 2.6); font-weight: 700; border-radius: 999px; padding: calc(var(--u) * 0.8) calc(var(--u) * 2.2); }
+  .ci.bad { background: #ef444422; color: var(--red); border: 2px solid var(--red); }
+  .ci.good { background: #10b98122; color: var(--green); border: 2px solid var(--green); }
+  .gaas { display: inline-block; font-size: calc(var(--u) * 2.4); font-weight: 700; letter-spacing: 0.12em; color: var(--violet); border: 2px solid var(--violet); background: #a78bfa1f; border-radius: 999px; padding: calc(var(--u) * 0.6) calc(var(--u) * 2.2); }
+  .logo { width: calc(var(--u) * 12); height: calc(var(--u) * 12); }
+  .cta { font-size: calc(var(--u) * 3); background: #020806; border: 2px solid var(--green); border-radius: calc(var(--u) * 1); padding: calc(var(--u) * 1) calc(var(--u) * 2.4); color: var(--green); }
+  .pills { display: flex; gap: calc(var(--u) * 1.2); flex-wrap: wrap; justify-content: center; }
+  .pill { font-size: calc(var(--u) * 2); border: 1px solid #1d3a2f; background: var(--card); border-radius: 999px; padding: calc(var(--u) * 0.6) calc(var(--u) * 1.8); }
+  .vs { display: flex; gap: calc(var(--u) * 2.4); flex-wrap: wrap; justify-content: center; width: 100%; }
+  .col { flex: 1 1 calc(var(--u) * 34); max-width: calc(var(--u) * 40); background: var(--card); border: 1px solid #1d3a2f; border-radius: calc(var(--u) * 1.4); padding: calc(var(--u) * 2.4); text-align: left; }
+  .col.us { border: 2px solid var(--green); box-shadow: 0 0 calc(var(--u) * 6) #10b98133; }
+  .col h4 { font-size: calc(var(--u) * 2.6); font-weight: 700; margin-bottom: calc(var(--u) * 0.4); }
+  .col.them { color: var(--muted); }
+  #caption { position: absolute; left: 50%; bottom: calc(var(--u) * 2.4); transform: translateX(-50%); width: min(90%, calc(var(--u) * 88)); text-align: center; font-size: calc(var(--u) * 2.3); font-weight: 500; line-height: 1.35; color: #fff; background: #000a; border-radius: calc(var(--u) * 1); padding: calc(var(--u) * 0.8) calc(var(--u) * 1.8); }
+  #caption:empty { display: none; }
+  .tall #caption { bottom: 20%; }
+  .tall .scene { inset: 0 0 24% 0; }
+  .row .mono { font-size: 0.88em; white-space: nowrap; }
+  #s2 { gap: calc(var(--u) * 1.6); }
+  .bar { position: absolute; left: 0; bottom: 0; height: calc(var(--u) * 0.6); background: var(--green); }
+  .cursor { display: inline-block; width: 0.6em; background: var(--green); color: transparent; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <!-- 1. the pain -->
+  <div class="scene" id="s1">
+    <div class="ci bad">✗ CI failed</div>
+    <div class="big">Your E2E tests keep <span class="red">breaking</span>.</div>
+    <div class="small" data-at="0.45" style="opacity:0">And nobody has time to write new ones.</div>
+  </div>
+  <!-- 2. GaaS -->
+  <div class="scene" id="s2">
+    <div class="huge">Keep<span class="green">Green</span></div>
+    <div class="gaas" data-at="0.2" style="opacity:0">GaaS</div>
+    <div class="big" data-at="0.2" style="opacity:0">Agentic AI <span class="violet">as a Service</span></div>
+    <div class="mid" data-at="0.45" style="opacity:0">for your end-to-end tests.</div>
+    <div class="mid green" data-at="0.75" style="opacity:0">…without the service.</div>
+  </div>
+  <!-- 3. one command -->
+  <div class="scene" id="s3">
+    <div class="mid">One command. <span class="green">Live in 60 seconds.</span></div>
+    <div class="term">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div id="typed"></div>
+      <div class="row" data-at="0.35"><span class="green">✓</span> App found: npm run dev → localhost:3000</div>
+      <div class="row" data-at="0.5"><span class="green">✓</span> AI: your own key, in your own CI</div>
+      <div class="row" data-at="0.68"><span class="green">✓</span> Workflows written: explore + heal</div>
+    </div>
+  </div>
+  <!-- 4. it writes tests -->
+  <div class="scene" id="s4">
+    <div class="mid">The agent finds untested flows and <span class="green">writes the tests</span>.</div>
+    <div class="pr">
+      <h3><span class="badge">PR</span> KeepGreen: 2 new end-to-end tests</h3>
+      <div class="row" data-at="0.3"><span class="green">✓</span> Adds the mug to the cart, count shows 1</div>
+      <div class="row" data-at="0.42"><span class="green">✓</span> Signs up and lands on the dashboard</div>
+      <div class="row" data-at="0.7"><span class="green">✓</span> Passed 5 runs in a row</div>
+      <div class="row" data-at="0.8"><span class="green">✓</span> Anti-cheat guard: real assertions only</div>
+      <div class="row" data-at="0.88" style="color:var(--muted)">AI cost for this run: about $0.04</div>
+    </div>
+  </div>
+  <!-- 5. it heals -->
+  <div class="scene" id="s5">
+    <div class="mid">UI changed? It <span class="green">fixes the test</span> and proves it.</div>
+    <div id="ci5" class="ci bad">✗ "Log in" button not found</div>
+    <div class="pr">
+      <h3><span class="badge">PR</span> AutoHeal: fix login locator</h3>
+      <div class="row" data-at="0.15"><span class="red">−</span> <span class="mono">getByRole('button', { name: 'Log in' })</span></div>
+      <div class="row" data-at="0.22"><span class="green">+</span> <span class="mono">getByRole('button', { name: 'Sign in' })</span></div>
+      <div class="row" data-at="0.4"><span class="green">✓</span> Proven: 5/5 green runs</div>
+      <div class="row" data-at="0.6" style="color:var(--muted)">Real app bug? You get an issue, not a hidden test.</div>
+    </div>
+  </div>
+  <!-- 6. GaaS without the service -->
+  <div class="scene" id="s6">
+    <div class="mid">AI testing as a service, <span class="green">minus the service</span>.</div>
+    <div class="vs">
+      <div class="col them" data-at="0.05" style="opacity:0">
+        <h4>Hosted AI testing</h4>
+        <div class="row" style="opacity:1"><span class="red">✗</span> Sign up, new vendor</div>
+        <div class="row" style="opacity:1"><span class="red">✗</span> Usually a monthly bill</div>
+        <div class="row" style="opacity:1"><span class="red">✗</span> Runs on their servers</div>
+      </div>
+      <div class="col us" data-at="0.3" style="opacity:0">
+        <h4>Keep<span class="green">Green</span> <span class="violet">GaaS</span></h4>
+        <div class="row" style="opacity:1"><span class="green">✓</span> No account, no vendor</div>
+        <div class="row" style="opacity:1"><span class="green">✓</span> 100% free · MIT</div>
+        <div class="row" style="opacity:1"><span class="green">✓</span> Your CI, your AI key</div>
+      </div>
+    </div>
+  </div>
+  <!-- 7. end card -->
+  <div class="scene" id="s7">
+    <img class="logo" id="logo2" alt="">
+    <div class="big">Keep<span class="green">Green</span></div>
+    <div class="small">Your AI QA engineer, running in your own CI.</div>
+    <div class="pills">
+      <span class="pill"><span class="violet">GaaS</span></span><span class="pill">100% free · MIT</span><span class="pill">Your AI key</span><span class="pill">Can't cheat</span>
+    </div>
+    <div class="cta">npx keepgreen init</div>
+    <div class="small">⭐ github.com/xsignon-secure/keepgreen</div>
+  </div>
+  <div id="caption"></div>
+  <div class="bar" id="bar"></div>
+</div>
+<script>
+  // The recorder calls setTiming() with each scene's [id, start, end, caption]
+  // (from the voiceover lengths), then render(t) for every frame.
+  let SCENES = [['s1', 0, 5, ''], ['s2', 5, 11, ''], ['s3', 11, 17, ''], ['s4', 17, 27, ''], ['s5', 27, 35, ''], ['s6', 35, 43, ''], ['s7', 43, 49, '']];
+  let TOTAL = 49;
+  const COMMAND = '$ npx keepgreen init';
+  const clamp = (x) => Math.max(0, Math.min(1, x));
+  function setUnit() {
+    const w = innerWidth, h = innerHeight;
+    // Portrait (Reels, Shorts): bigger type so it reads on a phone.
+    const u = h > w ? Math.min(w / 66, h / 110) : Math.min(w / 100, h / 56);
+    document.documentElement.style.setProperty('--u', `${u}px`);
+    document.documentElement.classList.toggle('tall', h > w);
+  }
+  window.setTiming = (scenes, total) => { SCENES = scenes; TOTAL = total; window.TOTAL = total; };
+  window.render = (t) => {
+    setUnit();
+    let caption = '';
+    SCENES.forEach(([id, a, b, text], i) => {
+      const el = document.getElementById(id);
+      const p = (t - a) / (b - a);
+      const last = i === SCENES.length - 1;
+      const on = t >= a && (last || t < b);
+      const fade = last ? clamp((t - a) / 0.35) : Math.min(clamp((t - a) / 0.35), clamp((b - t) / 0.35));
+      el.style.opacity = on ? String(fade) : '0';
+      el.style.transform = `translateY(${(1 - clamp((t - a) / 0.35)) * 12}px)`;
+      if (on) caption = text;
+      for (const node of el.querySelectorAll('[data-at]')) node.style.opacity = String(clamp((p - Number(node.dataset.at)) / 0.06));
+      if (id === 's3') {
+        const n = Math.round(clamp(p / 0.3) * COMMAND.length);
+        const blink = Math.floor(t * 3) % 2 === 0;
+        document.getElementById('typed').innerHTML = `<span class="green">${COMMAND.slice(0, n)}</span>${blink ? '<span class="cursor">_</span>' : ''}`;
+      }
+      if (id === 's5') {
+        const ok = p > 0.4;
+        const ci = document.getElementById('ci5');
+        ci.className = `ci ${ok ? 'good' : 'bad'}`;
+        ci.textContent = ok ? '✓ CI green again' : '✗ "Log in" button not found';
+      }
+    });
+    document.getElementById('caption').textContent = caption;
+    document.getElementById('bar').style.width = `${clamp(t / TOTAL) * 100}%`;
+  };
+  window.TOTAL = TOTAL;
+  window.setLogo = (src) => { for (const id of ['logo2']) document.getElementById(id).src = src; };
+  render(0);
+</script>
+</body>
+</html>

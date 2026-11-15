@@ -1,0 +1,9 @@
+[
+  { "id": "s1", "say": "Your end-to-end tests keep breaking. And nobody has time to write new ones.", "caption": "Your end-to-end tests keep breaking. And nobody has time to write new ones." },
+  { "id": "s2", "say": "Meet Keep Green. Agentic AI as a service, for your end-to-end tests. Without the service.", "caption": "Meet KeepGreen: agentic AI as a service for your end-to-end tests. Without the service." },
+  { "id": "s3", "say": "One command sets it up. It finds your app, uses your own AI key, and writes the workflows.", "caption": "One command sets it up. It finds your app, uses your own AI key, and writes the workflows." },
+  { "id": "s4", "say": "Every week, the agent explores your app, finds the flows nobody tests, and opens a pull request with new tests. Each one passed five runs in a row.", "caption": "Every week the agent explores your app, finds untested flows and opens a PR with new tests. Each passed 5 runs in a row." },
+  { "id": "s5", "say": "When your UI changes, it fixes the broken test and proves the fix. A real bug? You get an issue, not a hidden test.", "caption": "When your UI changes, it fixes the broken test and proves the fix. A real bug? You get an issue, not a hidden test." },
+  { "id": "s6", "say": "No account. No vendor. No monthly bill. It runs in your own C.I., with your own key. Free and open source.", "caption": "No account. No vendor. No monthly bill. It runs in your own CI, with your own key. Free and open source." },
+  { "id": "s7", "say": "Keep Green. Run N P X keep green init, and give us a star on GitHub.", "caption": "Run npx keepgreen init, and give us a ⭐ on GitHub." }
+]
