@@ -37,8 +37,10 @@ import {
 } from 'xsignon-autoheal';
 import { ConfigFileError, loadConfigFile, resolveConfig } from './config.js';
 import { existingTitles, explore, exploreReport } from './explore.js';
+import { fixProject, type FileFix } from './fixups.js';
+import { explorePr, openSetupPr, runExplore, setupPrBody, status, type SetupPr } from './github.js';
 import { init } from './init.js';
-import { PROVIDER_LABEL, SECRET_NAME, connectGithub, detectProvider, githubReady, githubRepo, healWorkflowText, setupChecks, type GithubStep, type Provider } from './setup.js';
+import { PROVIDER_LABEL, SECRET_NAME, connectGithub, detectProvider, githubReady, githubRepo, healWorkflowText, keyFromEnv, runCommand, setupChecks, type GithubStep, type Provider } from './setup.js';
 import { newFilesPatch } from './newfiles.js';
 import { checkPatch } from './patch.js';
 import { lookupPrice } from './price.js';
@@ -51,10 +53,15 @@ OpenAI-compatible endpoint). Built on playwright-e2e-mcp and AutoHeal. MIT, no a
 Start here: npx keepgreen init
 
   keepgreen init [--provider anthropic|openai|openrouter] [--url <app> | --start-command <cmd>
-                 --start-url <url>] [--github | --no-github] [--force] [--dry-run]
+                 --start-url <url>] [--github | --no-github] [--no-pr] [--no-fix] [--force] [--dry-run]
         set everything up in one go: finds where your app runs and how CI installs it, writes
-        .keepgreen.yml, the explore workflow and AutoHeal's heal workflow, and (with the gh CLI)
-        adds your AI key secret and lets Actions open PRs
+        .keepgreen.yml, the explore workflow and AutoHeal's heal workflow, adds the JSON report,
+        traces, artifact upload and workflow_dispatch your tests need (--no-fix: leave them), and
+        (with the gh CLI) adds your AI key secret, lets Actions open PRs and opens a PR with it all
+  keepgreen run [--url <app>] [--flow "<sentence>" ...] [--max-flows 3] [--watch]
+        start the explore workflow on GitHub; --watch waits and prints the PR it opened
+  keepgreen status
+        the key, the Actions setting, the latest explore and heal runs, and PRs to review
   keepgreen doctor
         check this project and machine
   keepgreen explore [--url <app>] [--start-command <cmd> --start-url <url>] [--pages /a,/b]
@@ -266,17 +273,22 @@ async function cmdInit(argv: string[]): Promise<number> {
       'start-url': { type: 'string' },
       github: { type: 'boolean' },
       'no-github': { type: 'boolean' },
+      'no-pr': { type: 'boolean' },
+      'no-fix': { type: 'boolean' },
     },
     strict: true,
   });
   const root = path.resolve(values.project ?? '.');
   const dryRun = values['dry-run'] === true;
+  const tty = process.stdin.isTTY === true && process.stdout.isTTY === true;
   let provider: Provider;
   try {
     provider = detectProvider(process.env, values.provider);
   } catch (error) {
     throw new ConfigError((error as Error).message);
   }
+  // No --provider and no key in this shell: ask instead of silently picking Anthropic.
+  if (tty && !dryRun && values.provider === undefined && !keyFromEnv(provider, process.env)) provider = await askProvider();
   if (values.url) checkRemoteUrl(values.url);
   if (values['start-command'] && !values['start-url'] && !values.url) throw new ConfigError('--start-command needs --start-url (the address to wait for).');
   const target = {
@@ -287,6 +299,9 @@ async function cmdInit(argv: string[]): Promise<number> {
   const healFile = path.join(root, HEAL_WORKFLOW);
   const healExisted = await access(healFile).then(() => true, () => false);
   const r = await init(root, { force: values.force === true, dryRun, provider, target });
+  // The lines of the user's own setup that KeepGreen and AutoHeal need, made
+  // before AutoHeal's checks so those see the result.
+  const fixes: FileFix[] = values['no-fix'] ? [] : await fixProject(root, { dryRun });
 
   // AutoHeal writes the heal workflow. Its own "what to do next" list is
   // replaced by KeepGreen's below; only its checks of the test setup are kept.
@@ -309,7 +324,8 @@ async function cmdInit(argv: string[]): Promise<number> {
   for (const w of r.written) out.push(`  ${dryRun ? 'would write' : 'wrote'}    ${w}`);
   if (healWritten) out.push(`  wrote    ${HEAL_WORKFLOW} (by AutoHeal)`);
   for (const w of r.skipped) out.push(`  kept     ${w} (exists; --force to overwrite)`);
-  if (t.webServerNeedsReuse) {
+  for (const f of fixes) out.push(`  ${dryRun ? 'would edit' : 'edited'}   ${f.file}: ${f.changes.join('; ')}`);
+  if (t.webServerNeedsReuse && !fixes.some((f) => /webServer/.test(f.changes.join(' ')))) {
     out.push('', "  Tip: playwright.config starts the app too. Let it reuse the one KeepGreen starts:", '       reuseExistingServer: !process.env.CI || !!process.env.KEEPGREEN');
   }
 
@@ -319,17 +335,22 @@ async function cmdInit(argv: string[]): Promise<number> {
   }
 
   let ghSteps: GithubStep[] = [];
-  const remote = spawnSync('git', ['-C', root, 'remote', 'get-url', 'origin'], { encoding: 'utf8' });
-  const repo = remote.status === 0 ? githubRepo(remote.stdout ?? '') : undefined;
+  let pr: SetupPr | undefined;
+  const repo = originRepo(root);
   if (!dryRun && values['no-github'] !== true) {
     const ready = githubReady(root);
-    const tty = process.stdin.isTTY === true && process.stdout.isTTY === true;
     if (ready.why) {
       if (values.github) out.push('', `  GitHub   not connected: ${ready.why}`);
-    } else if (ready.repo && (values.github || (tty && (await ask(`\nAdd your AI key to ${ready.repo} and let Actions open PRs, using the gh CLI? [Y/n] `))))) {
+    } else if (ready.repo && (values.github || (tty && (await ask(`\nFinish on GitHub with the gh CLI: add your AI key to ${ready.repo}, let Actions open PRs${values['no-pr'] ? '' : ' and open a PR with these files'}? [Y/n] `))))) {
       ghSteps = connectGithub({ repo: ready.repo, provider, env: process.env, interactive: tty });
       out.push('', `  GitHub   ${ready.repo}`);
       for (const s of ghSteps) out.push(`    ${s.ok ? '✓' : '✗'} ${s.what}${s.fix ? `\n        do it here: ${s.fix}` : ''}`);
+      if (values['no-pr'] !== true) {
+        const files = changedFiles(root, [CONFIG_FILE_NAME, '.github/workflows/keepgreen-explore.yml', HEAL_WORKFLOW, '.gitignore', ...fixes.map((f) => f.file)]);
+        const listed = [...r.written.map((w) => `\`${w}\` (new)`), ...(healWritten ? [`\`${HEAL_WORKFLOW}\` (new, AutoHeal)`] : []), ...fixes.map((f) => `\`${f.file}\`: ${f.changes.join('; ')}`)];
+        pr = openSetupPr({ root, repo: ready.repo, files, body: setupPrBody(listed, provider) });
+        out.push(pr.ok ? `    ✓ opened ${pr.url} (branch ${pr.branch})` : `    ✗ no setup PR: ${pr.why}`);
+      }
     }
   }
 
@@ -341,13 +362,113 @@ async function cmdInit(argv: string[]): Promise<number> {
     if (provider === 'openai') todo.push(`Add the repository variable AUTOHEAL_MODEL with your OpenAI model${web ? `: ${web}/settings/variables/actions/new` : ''}`);
     if (values['no-github'] !== true) todo.push('(or let KeepGreen do these two: install the gh CLI, then run `npx keepgreen init --github`)');
   }
-  todo.push('git add .keepgreen.yml .github .gitignore && git commit -m "Add KeepGreen" && git push');
-  todo.push(`Run it: ${web ? `${web}/actions/workflows/keepgreen-explore.yml` : 'Actions > KeepGreen explore'} > Run workflow. You get one PR with new, proven tests.`);
+  if (pr?.ok) todo.push(`Review and merge ${pr.url}`);
+  else {
+    const extra = fixes.filter((f) => !f.file.startsWith('.github/')).map((f) => ` ${f.file}`).join('');
+    todo.push(`git add .keepgreen.yml .github .gitignore${extra} && git commit -m "Add KeepGreen" && git push`);
+  }
+  todo.push(`Run it: npx keepgreen run (or ${web ? `${web}/actions/workflows/keepgreen-explore.yml` : 'Actions > KeepGreen explore'} > Run workflow). You get one PR with new, proven tests. See how it is going: npx keepgreen status`);
   out.push('', '  Next:');
   todo.forEach((s, i) => out.push(`    ${i + 1}. ${s}`));
   out.push('', '  Try it on this machine first: npx keepgreen explore --dry-run   (plans flows, writes nothing)', '');
   process.stdout.write(out.join('\n'));
   return code;
+}
+
+const CONFIG_FILE_NAME = '.keepgreen.yml';
+
+/** owner/name of the origin remote, if it is on GitHub. */
+function originRepo(root: string): string | undefined {
+  const remote = spawnSync('git', ['-C', root, 'remote', 'get-url', 'origin'], { encoding: 'utf8' });
+  return remote.status === 0 ? githubRepo(remote.stdout ?? '') : undefined;
+}
+
+/** Those of `files` that git sees as new or changed. */
+function changedFiles(root: string, files: string[]): string[] {
+  const r = spawnSync('git', ['-C', root, 'status', '--porcelain', '--untracked-files=all', '--', ...new Set(files)], { encoding: 'utf8' });
+  return (r.stdout ?? '')
+    .split('\n')
+    .filter(Boolean)
+    .map((l) => l.slice(3).replace(/^"|"$/g, ''));
+}
+
+async function askProvider(): Promise<Provider> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = (await rl.question('\nWhich AI provider will KeepGreen use? 1) Anthropic  2) OpenAI  3) OpenRouter  [1] ')).trim().toLowerCase();
+    if (answer === '2' || answer.startsWith('openai')) return 'openai';
+    if (answer === '3' || answer.startsWith('openrouter')) return 'openrouter';
+    return 'anthropic';
+  } finally {
+    rl.close();
+  }
+}
+
+/** The repository for run/status: --repo, else the origin remote. */
+function repoFor(root: string, flag: string | undefined): string {
+  const repo = flag?.trim() || originRepo(root);
+  if (!repo || !/^[\w.-]+\/[\w.-]+$/.test(repo)) throw new ConfigError('No GitHub repository: run this in a clone of it, or pass --repo owner/name.');
+  return repo;
+}
+
+function needGh(): void {
+  const auth = runCommand('gh', ['auth', 'status']);
+  if (auth.status === 127) throw new ConfigError('This needs the GitHub CLI (gh): https://cli.github.com');
+  if (auth.status !== 0) throw new ConfigError('gh is not signed in: run `gh auth login` first.');
+}
+
+async function cmdRun(argv: string[]): Promise<number> {
+  const { values } = parseArgs({
+    args: argv,
+    options: {
+      project: { type: 'string' },
+      repo: { type: 'string' },
+      ref: { type: 'string' },
+      url: { type: 'string' },
+      flow: { type: 'string', multiple: true },
+      'max-flows': { type: 'string' },
+      watch: { type: 'boolean' },
+    },
+    strict: true,
+  });
+  if (values.url) checkRemoteUrl(values.url);
+  if (values['max-flows'] && !/^(10|[1-9])$/.test(values['max-flows'])) throw new ConfigError('--max-flows must be 1-10.');
+  if (values.flow?.some((f) => f.includes(';'))) throw new ConfigError('A --flow cannot contain ";" (the workflow uses it to separate flows).');
+  const repo = repoFor(path.resolve(values.project ?? '.'), values.repo);
+  needGh();
+  const started = runExplore({
+    repo,
+    ...(values.url ? { url: values.url } : {}),
+    ...(values.flow?.length ? { flows: values.flow } : {}),
+    ...(values['max-flows'] ? { maxFlows: values['max-flows'] } : {}),
+    ...(values.ref ? { ref: values.ref } : {}),
+  });
+  if (!started.ok) {
+    log(started.why ?? 'could not start the workflow');
+    return 1;
+  }
+  process.stdout.write(`KeepGreen explore started on ${repo}: ${started.url}\n`);
+  if (!values.watch) {
+    process.stdout.write('It opens a pull request with the new tests when it is done. Follow it with: npx keepgreen status\n');
+    return 0;
+  }
+  if (!started.id) {
+    log('Could not find the new run to watch; open the link above.');
+    return 0;
+  }
+  const watched = spawnSync('gh', ['run', 'watch', started.id, '--repo', repo, '--exit-status'], { stdio: 'inherit' });
+  const prUrl = explorePr(repo, started.id);
+  process.stdout.write(prUrl ? `\nNew tests to review: ${prUrl}\n` : '\nNo pull request this time; the run summary says why.\n');
+  return watched.status === 0 ? 0 : 1;
+}
+
+async function cmdStatus(argv: string[]): Promise<number> {
+  const { values } = parseArgs({ args: argv, options: { project: { type: 'string' }, repo: { type: 'string' } }, strict: true });
+  const repo = repoFor(path.resolve(values.project ?? '.'), values.repo);
+  needGh();
+  const r = status({ repo });
+  process.stdout.write(r.text);
+  return r.problems ? 1 : 0;
 }
 
 async function cmdDoctor(argv: string[]): Promise<number> {
@@ -398,6 +519,8 @@ export async function main(argv: string[]): Promise<number> {
     if (command === 'autoheal') return runAutoheal(rest);
     if (command === 'init') return await cmdInit(rest);
     if (command === 'doctor') return await cmdDoctor(rest);
+    if (command === 'run') return await cmdRun(rest);
+    if (command === 'status') return await cmdStatus(rest);
     if (command === 'check-patch') return await cmdCheckPatch(rest);
     process.stderr.write(`Unknown command "${command}".\n\n${USAGE}`);
     return 2;

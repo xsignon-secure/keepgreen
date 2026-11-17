@@ -45,7 +45,7 @@ don't want: no vendor, no account, no seat price, no platform holding your code.
 
 | | Typical hosted AI testing tools | **KeepGreen GaaS** |
 | --- | --- | --- |
-| Setup | sign-up, SDK or app install, dashboard | **`npx keepgreen init`** |
+| Setup | sign-up, SDK or app install, dashboard | **`npx keepgreen init`**, then merge its PR |
 | Who runs the agent | their cloud | **your GitHub Actions runner** |
 | Your code and app | sent to their cloud | **stays in your CI** (only your AI provider sees the prompts) |
 | Price | per seat or per test run | **free (MIT)**, you pay only your AI key |
@@ -66,22 +66,29 @@ In your project folder, with your AI key in the shell (Anthropic, OpenAI or Open
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...     # or OPENAI_API_KEY, or OPENROUTER_API_KEY
-npx keepgreen init                      # 1. sets everything up
-git add . && git commit -m "Add KeepGreen" && git push   # 2. ship it
+npx keepgreen init                      # 1. sets everything up and opens a setup PR
+# 2. merge that PR
+npx keepgreen run                       # 3. start it (or Actions > KeepGreen explore > Run workflow)
 ```
 
-**3.** Open *Actions > KeepGreen explore > Run workflow*. A few minutes later you get **one PR
-with new, proven tests**.
+A few minutes later you get **one PR with new, proven tests**. `npx keepgreen status` shows how
+runs are going and which PRs wait for your review.
 
 What `init` does for you:
 
 - finds where your app runs (`playwright.config` webServer or baseURL, or your `dev`/`start`
   script and its port) and how CI installs it (npm, pnpm, yarn or pip),
 - writes `.keepgreen.yml`, the explore workflow and AutoHeal's heal workflow, set to your AI
-  provider,
-- with the [GitHub CLI](https://cli.github.com) signed in, it asks to add your key as a repository
-  secret and to let Actions open PRs. The key goes straight to GitHub and is never printed.
-  Without `gh`, it prints the two links to click.
+  provider (no key in the shell? it asks which provider),
+- **fixes your test setup** so healing works: adds a JSON report and traces on failure to
+  `playwright.config`, lets its `webServer` reuse the app KeepGreen starts, and adds
+  `workflow_dispatch` and a report upload to your test workflow. Every edit is listed and is in
+  the PR for review; `--no-fix` leaves your files alone,
+- with the [GitHub CLI](https://cli.github.com) signed in, it asks once, then adds your key as a
+  repository secret, lets Actions open PRs and **opens a PR with exactly the files it wrote or
+  edited** (branch `keepgreen/setup`; nothing else you have changed goes in). The key goes
+  straight to GitHub and is never printed. `--no-pr` skips the PR; without `gh`, it prints the
+  links to click and the one `git` command to run.
 
 Want to see it first? `npx keepgreen explore --dry-run` plans the flows on your machine and
 writes nothing.
@@ -169,7 +176,15 @@ npx keepgreen heal
   test workflow fails and opens a fix PR.
 
 `init` sets both to your package manager and AI provider. With `gh` it also adds the key secret
-and the PR permission. By hand, that is:
+and the PR permission and opens the setup PR. Then, from your terminal:
+
+```bash
+npx keepgreen run                                     # start explore on GitHub
+npx keepgreen run --flow "A shopper checks out" --watch   # name the flow, wait, print the PR
+npx keepgreen status                                  # key, setting, latest runs, PRs to review
+```
+
+By hand, the GitHub side is:
 
 1. Add your key as a repository secret: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` (plus a repository
    variable `AUTOHEAL_MODEL`) or `OPENROUTER_API_KEY`.
@@ -184,7 +199,7 @@ and the PR permission. By hand, that is:
 Or use the action directly:
 
 ```yaml
-- uses: xsignon-secure/keepgreen@v0.4.0
+- uses: xsignon-secure/keepgreen@v0.5.0
   with:
     url: http://localhost:3000
     anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -299,7 +314,8 @@ The same works with flags: `--login-url`, `--login-step` (repeat it), `--login-c
 ### Playwright `webServer`
 
 If your `playwright.config` starts the app with `webServer`, and KeepGreen starts it too
-(`start-command`), let Playwright reuse it during a KeepGreen run:
+(`start-command`), Playwright must reuse it during a KeepGreen run. `init` makes this edit for
+you:
 
 ```ts
 webServer: { command: 'npm run start', url: 'http://127.0.0.1:3000/', reuseExistingServer: !process.env.CI || !!process.env.KEEPGREEN },
@@ -309,7 +325,9 @@ webServer: { command: 'npm run start', url: 'http://127.0.0.1:3000/', reuseExist
 
 ```
 keepgreen init [--provider anthropic|openai|openrouter] [--url <app> | --start-command <cmd>
-               --start-url <url>] [--github | --no-github] [--force] [--dry-run]
+               --start-url <url>] [--github | --no-github] [--no-pr] [--no-fix] [--force] [--dry-run]
+keepgreen run [--url <app>] [--flow "<sentence>" ...] [--max-flows 3] [--ref <branch>] [--watch]
+keepgreen status                        # AI key secret, PR setting, latest runs, PRs to review
 keepgreen doctor
 keepgreen explore [--url <app>] [--start-command <cmd> --start-url <url>] [--pages /a,/b]
                   [--flow "<sentence>" ...] [--max-flows 3] [--max-usd 3] [--runs 5]

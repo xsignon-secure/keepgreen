@@ -98,7 +98,7 @@ export function detectApp(root: string, pm: PackageManager = detectPackageManage
       const port = /\bport\s*:\s*(\d{2,5})\b/.exec(block)?.[1];
       const url = literal(block, 'url') ?? (port ? `http://localhost:${port}` : undefined);
       if (command && url) {
-        return { startCommand: command, startUrl: url, from: 'playwright.config webServer', webServerNeedsReuse: !/KEEPGREEN/.test(block) };
+        return { startCommand: command, startUrl: url, from: 'playwright.config webServer', webServerNeedsReuse: !/KEEPGREEN|reuseExistingServer\s*:\s*true\b/.test(block) };
       }
     }
     const base = literal(config, 'baseURL');

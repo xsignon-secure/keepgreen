@@ -12,6 +12,9 @@
 #   publish  never runs your project's code: it accepts the patch only if it
 #            just ADDS test files, then opens the PR.
 #
+# `npx keepgreen init` does steps 1, 3 and 4 for you (3 and 4 with the gh
+# CLI) and opens a PR with this file; `npx keepgreen run` does step 5.
+#
 # Before you start:
 #   1. Set url: (or start-command + start-url) in .keepgreen.yml.
 #   2. Make the explore job match your test job below: Node or Python
@@ -24,7 +27,8 @@
 #   KeepGreen started: reuseExistingServer: !process.env.CI || !!process.env.KEEPGREEN
 #   4. Settings > Actions > General > Workflow permissions: tick
 #      "Allow GitHub Actions to create and approve pull requests".
-#   5. Run it from Actions > KeepGreen explore > Run workflow, or turn on the
+#   5. Run it from Actions > KeepGreen explore > Run workflow (or
+#      `npx keepgreen run`), or turn on the
 #      weekly schedule below.
 #   Optional: GitHub does not start your CI on a PR opened with the built-in
 #   token. To get checks on KeepGreen's PRs, add a fine-grained token (this

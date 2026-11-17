@@ -6,3 +6,5 @@ export { init, type InitResult, type InitOptions } from './init.js';
 export { detectApp, detectPackageManager, detectProvider, keyFromEnv, configText, exploreWorkflowText, healWorkflowText, githubRepo, githubReady, connectGithub, SECRET_NAME, OPENROUTER_DEFAULT_MODEL, type AppTarget, type Provider, type PackageManager, type GithubStep, type Run } from './setup.js';
 export { lookupPrice } from './price.js';
 export { VERSION } from './version.js';
+export { fixProject, fixPlaywrightConfigText, fixTestWorkflowText, findTestWorkflowFile, type FileFix } from './fixups.js';
+export { openSetupPr, setupPrBody, runExplore, explorePr, status, type SetupPr, type RunStarted } from './github.js';
