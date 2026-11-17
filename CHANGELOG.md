@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0
+
+Setup and everyday use with no homework left. Found by walking a fresh install on a copy of the demo shop: `init` still printed five edits to make by hand, then a commit, a push and a click in the Actions tab.
+
+- **`init` fixes your test setup itself.** In `playwright.config` it adds a JSON report (last in the list, because the html reporter empties `playwright-report/`), `trace: 'retain-on-failure'`, and `|| !!process.env.KEEPGREEN` on `webServer.reuseExistingServer`. In your test workflow it adds `workflow_dispatch` (any `on:` form) and uploads `playwright-report/` and `test-results/` when the tests fail. Only patterns it understands are edited, a second run changes nothing, every edit is listed, and `--no-fix` turns it off. AutoHeal's checks then pass instead of printing fixes.
+- **`init` opens the setup PR.** With `gh`, the one question now also covers a pull request with exactly the files `init` wrote or edited (branch `keepgreen/setup`; other changes, even staged ones, stay out). `--github` does it without asking; `--no-pr` skips it.
+- **`init` asks for the AI provider** when there is no key in the shell, instead of silently picking Anthropic.
+- **`keepgreen run`** starts the explore workflow on GitHub from your terminal (`--url`, `--flow`, `--max-flows`, `--ref`) and prints the run link; `--watch` waits and prints the PR it opened. If the workflow is not merged yet, it says so.
+- **`keepgreen status`** shows whether the AI key secret is there, whether Actions may open PRs, the latest explore and heal runs, and the KeepGreen / AutoHeal PRs waiting for review.
+- The "playwright.config starts the app too" tip no longer shows when `reuseExistingServer: true` already reuses it.
+
 ## 0.4.0
 
 KeepGreen as GaaS in 60 seconds: one command sets everything up.
